@@ -112,3 +112,42 @@ test('Validierung', async () => {
     await close();
   }
 });
+
+test('Katalog, Varianten, Preishinweis', async () => {
+  const { call, close } = await boot();
+  try {
+    const add = (id, user, article, price, variant) =>
+      call('POST', `/api/rounds/${id}/items`, user, { article, price, qty: 1, ...(variant === undefined ? {} : { variant }) });
+    const r1 = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Roma' } })).body.id;
+    await add(r1, 'uli', 'Pizza Margherita', '8,50', '26 cm');
+    await add(r1, 'anna', 'pizza  margherita', '8,50', '26 CM');
+    await add(r1, 'bob', 'Pizza Margherita', '10,50', '32 cm');
+    await add(r1, 'clara', 'Pizza Margarita', '8,50');
+
+    // Einmalig genutzte Namen (auch Tippfehler) werden nicht vorgeschlagen
+    const cat = (await call('GET', `/api/rounds/${r1}/catalog`, 'uli')).body;
+    assert.deepEqual(cat.map((e) => e.article), ['Pizza Margherita']);
+    assert.equal(cat[0].uses, 3);
+    const v26 = cat[0].variants.find((v) => v.variant.toLowerCase() === '26 cm');
+    assert.equal(v26.count, 2);
+    assert.equal(v26.last_price_cents, 850);
+
+    // Gruppierung: gleicher Name + gleiche Variante + gleicher Preis. 26 ≠ 32 cm, Margherita ≠ Margarita.
+    const d = (await call('GET', `/api/rounds/${r1}`, 'uli')).body;
+    assert.equal(d.groups.length, 3);
+    assert.equal(d.groups.find((g) => g.variant.toLowerCase() === '26 cm').qty, 2);
+
+    // Nächste Runde: Preisabweichung wird markiert, nichts wird automatisch gesetzt
+    const r2 = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'roma' } })).body.id;
+    await add(r2, 'uli', 'Pizza Margherita', '9,00', '26 cm');
+    await add(r2, 'anna', 'Pizza Margherita', '8,50', '26 cm');
+    const d2 = (await call('GET', `/api/rounds/${r2}`, 'uli')).body;
+    const g9 = d2.groups.find((g) => g.price_cents === 900);
+    const g85 = d2.groups.find((g) => g.price_cents === 850);
+    assert.equal(g9.price_differs, true);
+    assert.equal(g9.known_price_cents, 850);
+    assert.equal(g85.price_differs, false);
+  } finally {
+    await close();
+  }
+});

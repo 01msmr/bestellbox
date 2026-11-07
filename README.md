@@ -6,7 +6,12 @@ alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt
 ## Funktionen
 
 - **Restaurant** (Name, Webadresse, Telefon) wird gespeichert und bei der nächsten Runde per Auswahl wieder angeboten.
-- **Eingabe** pro User: Artikel, Preis, Menge. Gleiche Artikel (gleicher Name, gleicher Preis) werden gruppiert.
+- **Eingabe** pro User: Artikel, Variante (Freitext, z. B. `26 cm`, `Fladenbrot, scharf`), Preis, Menge.
+  Gruppiert wird nach Name + Variante + Preis (Groß/Klein, Leerzeichen, Satzzeichen, Umlaut-Schreibweisen egal;
+  ähnliche Namen werden nie automatisch zusammengeführt).
+- **Katalog pro Restaurant:** Namen und Varianten aus früheren Bestellungen werden ab der 2. Nutzung vorgeschlagen.
+  Der **Preis wird nie vorausgefüllt**; ein Chip „zuletzt X € (ungeprüft)“ muss aktiv übernommen werden.
+  Preisabweichungen werden beim Eintragen und im Bestell-Tab markiert. Die Verantwortung für den Preis liegt beim User.
 - **Drei Tabs:** *Nach Usern*, *Meine*, *Bestellen* (gebündelte Sammelliste zum Telefonieren/Kopieren).
 - **Status:** `fertig` und `bezahlt` sind zwei unabhängige Häkchen pro User, für alle sichtbar.
 - **Warnbanner**, solange nicht alle fertig sind.

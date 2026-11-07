@@ -125,6 +125,13 @@ function fmtRemaining(ms) {
   const p = (n) => String(n).padStart(2, '0');
   return hh ? `${hh}:${p(mm)}:${p(ss)}` : `${p(mm)}:${p(ss)}`;
 }
+function fold(s) {
+  return String(s ?? '')
+    .toLocaleLowerCase('de')
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .normalize('NFKD').replace(/\p{M}+/gu, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
 function parseMoney(v) {
   const n = Number(String(v).trim().replace(',', '.'));
   return Number.isFinite(n) ? n : NaN;
@@ -286,6 +293,7 @@ function roundView(id) {
   let d = null;
   let skew = 0;
   let expiredRefreshed = false;
+  let catalogLoaded = false;
   let tab = sessionStorage.getItem('bb_tab') || 'users';
 
   const head = h('section', { class: 'card' });
@@ -302,28 +310,75 @@ function roundView(id) {
 
   // Persistente Eingabezeile (wird bei Live-Updates nicht neu gebaut)
   const inArticle = h('input', { placeholder: 'Artikel', maxlength: 80, required: true, autocomplete: 'off' });
+  const inVariant = h('input', { placeholder: 'z. B. 26 cm, Fladenbrot, scharf', maxlength: 80, autocomplete: 'off' });
   const inPrice = h('input', { placeholder: 'Preis €', inputmode: 'decimal', required: true });
   const inQty = h('input', { type: 'number', min: 1, max: 99, value: 1 });
   const addBtn = h('button', { class: 'btn', type: 'submit' }, 'Hinzufügen');
+  const sugBox = h('div', { class: 'assist' });
+  let catalog = []; // gelernte Namen dieses Restaurants (nur Vorschläge, nichts wird automatisch gesetzt)
+
+  const loadCatalog = async () => {
+    catalog = (await api('GET', `/rounds/${id}/catalog`).catch(() => null)) ?? catalog;
+    updateAssist();
+  };
+  const knownEntry = () => catalog.find((e) => fold(e.article) === fold(inArticle.value));
+  const knownVariant = (e) => e?.variants.find((v) => fold(v.variant) === fold(inVariant.value));
+
+  function updateAssist() {
+    const q = fold(inArticle.value);
+    const e = knownEntry();
+    const parts = [];
+    if (q && !e) {
+      for (const c of catalog.filter((c) => fold(c.article).includes(q)).slice(0, 5)) {
+        parts.push(h('button', { type: 'button', class: 'pill', onmousedown: (ev) => ev.preventDefault(), onclick: () => { inArticle.value = c.article; updateAssist(); inVariant.focus(); } }, c.article));
+      }
+    }
+    if (e) {
+      for (const v of e.variants.filter((v) => v.variant).slice(0, 5)) {
+        parts.push(h('button', { type: 'button', class: 'pill', onclick: () => { inVariant.value = v.variant; updateAssist(); } }, v.variant));
+      }
+      const kv = knownVariant(e);
+      // Preis wird NIE vorausgefüllt – nur als Hinweis angeboten, damit er bewusst geprüft wird.
+      if (kv?.last_price_cents != null) {
+        parts.push(h('button', { type: 'button', class: 'pill price', onclick: () => { inPrice.value = (kv.last_price_cents / 100).toFixed(2).replace('.', ','); inPrice.focus(); } }, `zuletzt ${eur(kv.last_price_cents)} (ungeprüft) – übernehmen`));
+      }
+    }
+    sugBox.replaceChildren(...parts);
+  }
+  inArticle.addEventListener('input', updateAssist);
+  inVariant.addEventListener('input', updateAssist);
+
   const addForm = h(
     'form',
     {
       class: 'card',
       onsubmit: async (e) => {
         e.preventDefault();
-        const ok = await act(() => api('POST', `/rounds/${id}/items`, { article: inArticle.value, price: parseMoney(inPrice.value), qty: Number(inQty.value) || 1 }));
+        const price = parseMoney(inPrice.value);
+        const kv = knownVariant(knownEntry());
+        const ok = await act(() => api('POST', `/rounds/${id}/items`, { article: inArticle.value, variant: inVariant.value, price, qty: Number(inQty.value) || 1 }));
         if (ok) {
+          if (kv?.last_price_cents != null && Math.round(price * 100) !== kv.last_price_cents) toast(`Preis weicht ab – zuletzt ${eur(kv.last_price_cents)}`);
           inArticle.value = '';
+          inVariant.value = '';
           inPrice.value = '';
           inQty.value = 1;
           inArticle.focus();
+          updateAssist();
+          loadCatalog();
           current.refresh();
         }
       },
     },
     h('h3', null, 'Artikel eintragen'),
-    h('div', { class: 'grid3' }, h('label', null, 'Artikel', inArticle), h('label', null, 'Preis', inPrice), h('label', null, 'Menge', inQty)),
-    h('div', { style: 'margin-top:8px' }, addBtn)
+    h('div', { style: 'display:grid;gap:10px' },
+      h('label', null, 'Artikel', inArticle),
+      h('label', null, 'Variante (optional)', inVariant),
+      sugBox,
+      h('div', { class: 'grid2', style: 'grid-template-columns:2fr 1fr' }, h('label', null, 'Preis', inPrice), h('label', null, 'Menge', inQty)),
+      h('div', { class: 'notice' }, h('strong', null, '⚠ Preis selbst prüfen. '), 'Du bist für deine Angaben verantwortlich. Vorgeschlagene Preise stammen aus früheren Bestellungen und können veraltet oder falsch sein.')
+    ),
+    h('div', { style: 'margin-top:10px' }, addBtn)
   );
   const mineList = h('div', { class: 'card' });
   minePane.append(addForm, mineList);
@@ -366,6 +421,7 @@ function roundView(id) {
     const editPaypal = h('input', { value: d.paypal, maxlength: 120 });
     const editFee = h('input', { value: (d.delivery_fee_cents / 100).toFixed(2).replace('.', ','), inputmode: 'decimal' });
     head.replaceChildren(
+      ...[
       h('div', { class: 'row between' }, h('h2', { style: 'margin:0' }, d.restaurant.name), h('a', { href: '#/' }, '← Alle Runden')),
       contactLinks(d.restaurant),
       h(
@@ -400,6 +456,7 @@ function roundView(id) {
             )
           )
         : null
+      ].filter(Boolean)
     );
   }
 
@@ -439,7 +496,7 @@ function roundView(id) {
       h(
         'tbody',
         null,
-        u.items.map((i) => h('tr', null, h('td', { class: 'num' }, `${i.qty}×`), h('td', null, i.article), h('td', { class: 'num' }, eur(i.price_cents * i.qty))))
+        u.items.map((i) => h('tr', null, h('td', { class: 'num' }, `${i.qty}×`), h('td', null, i.article, i.variant ? h('div', { class: 'muted' }, i.variant) : null), h('td', { class: 'num' }, eur(i.price_cents * i.qty))))
       )
     );
   }
@@ -469,7 +526,7 @@ function roundView(id) {
 
   function renderMine() {
     const locked = d.locked;
-    for (const el of [inArticle, inPrice, inQty, addBtn]) el.disabled = locked;
+    for (const el of [inArticle, inVariant, inPrice, inQty, addBtn]) el.disabled = locked;
     const mineU = d.users.find((u) => lc(u.user) === lc(me));
     if (!mineU) {
       mineList.replaceChildren(h('h3', null, 'Meine Bestellung'), h('div', { class: 'muted' }, locked ? 'Runde ist gesperrt.' : 'Noch nichts eingetragen.'));
@@ -501,7 +558,7 @@ function roundView(id) {
                 h(
                   'tr',
                   null,
-                  h('td', null, i.article, h('div', { class: 'muted' }, `à ${eur(i.price_cents)}`)),
+                  h('td', null, i.article, i.variant ? ` · ${i.variant}` : '', h('div', { class: 'muted' }, `à ${eur(i.price_cents)}`)),
                   h('td', { class: 'num' }, h('div', { class: 'row', style: 'justify-content:flex-end;flex-wrap:nowrap' }, stepper(i, -1), h('strong', null, String(i.qty)), stepper(i, 1))),
                   h('td', { class: 'num' }, eur(i.price_cents * i.qty)),
                   h(
@@ -538,7 +595,7 @@ function roundView(id) {
 
   function orderText() {
     const lines = [`Bestellung ${d.restaurant.name}`];
-    for (const g of d.groups) lines.push(`${g.qty}× ${g.article} (${eur(g.price_cents)})`);
+    for (const g of d.groups) lines.push(`${g.qty}× ${g.article}${g.variant ? ` – ${g.variant}` : ''} (${eur(g.price_cents)})`);
     lines.push('', `Summe Artikel: ${eur(d.items_total_cents)}`);
     return lines.join('\n');
   }
@@ -560,7 +617,7 @@ function roundView(id) {
                   'tr',
                   null,
                   h('td', { class: 'num' }, `${g.qty}×`),
-                  h('td', null, g.article, h('div', { class: 'muted' }, g.users.map((x) => (x.qty > 1 ? `${x.user} ${x.qty}×` : x.user)).join(', '))),
+                  h('td', null, g.article, g.variant ? ` · ${g.variant}` : '', h('div', { class: 'muted' }, g.users.map((x) => (x.qty > 1 ? `${x.user} ${x.qty}×` : x.user)).join(', ')), g.price_differs ? h('div', { class: 'warn-text' }, `⚠ Preis prüfen – zuletzt ${eur(g.known_price_cents)}`) : null),
                   h('td', { class: 'num' }, eur(g.price_cents)),
                   h('td', { class: 'num' }, eur(g.sum_cents))
                 )
@@ -575,6 +632,7 @@ function roundView(id) {
             )
           )
         : h('p', { class: 'muted' }, 'Noch keine Positionen.'),
+      h('div', { class: 'notice', style: 'margin-top:10px' }, h('strong', null, '⚠ Preise sind Angaben der User und nicht geprüft. '), 'Vor dem Bestellen mit der Karte abgleichen.'),
       h(
         'div',
         { class: 'row', style: 'margin-top:10px' },
@@ -659,6 +717,10 @@ function roundView(id) {
         return;
       }
       skew = d.server_now - Date.now();
+      if (!catalogLoaded) {
+        catalogLoaded = true;
+        loadCatalog();
+      }
       renderHead();
       renderTimerControls();
       renderBanners();

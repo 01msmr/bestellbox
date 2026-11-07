@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS items (
   user TEXT NOT NULL,
   article TEXT NOT NULL,
   akey TEXT NOT NULL,
+  variant TEXT NOT NULL DEFAULT '',
+  vkey TEXT NOT NULL DEFAULT '',
   price_cents INTEGER NOT NULL,
   qty INTEGER NOT NULL
 );
@@ -49,11 +51,39 @@ export function openDb(file = ':memory:') {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
+  // Migration älterer Datenbanken (vor Einführung der Varianten)
+  const cols = db.prepare('PRAGMA table_info(items)').all().map((c) => c.name);
+  if (!cols.includes('variant')) db.exec("ALTER TABLE items ADD COLUMN variant TEXT NOT NULL DEFAULT ''");
+  if (!cols.includes('vkey')) db.exec("ALTER TABLE items ADD COLUMN vkey TEXT NOT NULL DEFAULT ''");
   return db;
 }
 
 const collapse = (s) => String(s ?? '').trim().replace(/\s+/g, ' ');
 const lower = (s) => collapse(s).toLocaleLowerCase('de');
+
+/**
+ * Vergleichsschlüssel für Artikelnamen. Gleicht NUR sichere Unterschiede aus:
+ * Groß/Klein, Leerzeichen, Satzzeichen, Akzente, ä=ae/ö=oe/ü=ue, ß=ss.
+ * Es wird bewusst nichts „ähnliches“ zusammengeführt (Cola ≠ Cola Zero, Nr. 12 ≠ Nr. 21).
+ */
+export function foldKey(s) {
+  return String(s ?? '')
+    .toLocaleLowerCase('de')
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+/** Variante ist Freitext (z. B. „26 cm“, „Fladenbrot, scharf“); verglichen wird nur Schreibweise-bereinigt. */
+export function parseVariant(v) {
+  const variant = collapse(v).slice(0, 80);
+  return { variant, vkey: foldKey(variant) };
+}
 
 function parseMoneyToCents(v, { max = 1000 } = {}) {
   const n = typeof v === 'number' ? v : Number(String(v ?? '').trim().replace(',', '.'));
@@ -109,9 +139,14 @@ export function createLogic(db, { admins = [] } = {}) {
     itemAll: db.prepare('SELECT * FROM items WHERE round_id = ? ORDER BY id'),
     itemGet: db.prepare('SELECT * FROM items WHERE id = ?'),
     itemInsert: db.prepare(
-      'INSERT INTO items (round_id, user, article, akey, price_cents, qty) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO items (round_id, user, article, akey, variant, vkey, price_cents, qty) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ),
-    itemUpdate: db.prepare('UPDATE items SET article = ?, akey = ?, price_cents = ?, qty = ? WHERE id = ?'),
+    itemUpdate: db.prepare('UPDATE items SET article = ?, akey = ?, variant = ?, vkey = ?, price_cents = ?, qty = ? WHERE id = ?'),
+    catalogRows: db.prepare(
+      `SELECT i.id, i.round_id, i.user, i.article, i.akey, i.variant, i.vkey, i.price_cents, r.created_at
+       FROM items i JOIN rounds r ON r.id = i.round_id WHERE r.restaurant_id = ? ORDER BY i.id`
+    ),
+
     itemDelete: db.prepare('DELETE FROM items WHERE id = ?'),
   };
 
@@ -187,7 +222,10 @@ export function createLogic(db, { admins = [] } = {}) {
     const price = parseMoneyToCents(body.price);
     const qty = body.qty === undefined || body.qty === '' ? 1 : Number(body.qty);
     if (!Number.isInteger(qty) || qty < 1 || qty > 99) throw new HttpError(400, 'Menge 1–99');
-    return { article, akey: lower(article), price, qty };
+    const akey = foldKey(article);
+    if (!akey) throw new HttpError(400, 'Artikel fehlt oder ist zu lang');
+    const { variant, vkey } = parseVariant(body.variant);
+    return { article, akey, variant, vkey, price, qty };
   }
 
   const isLocked = (r, now) => now >= r.expires_at;
@@ -198,7 +236,7 @@ export function createLogic(db, { admins = [] } = {}) {
     if (isLocked(r, Date.now())) throw new HttpError(423, 'Runde ist gesperrt');
     const it = parseItem(body);
     q.partUpsert.run(r.id, user);
-    return Number(q.itemInsert.run(r.id, user, it.article, it.akey, it.price, it.qty).lastInsertRowid);
+    return Number(q.itemInsert.run(r.id, user, it.article, it.akey, it.variant, it.vkey, it.price, it.qty).lastInsertRowid);
   }
 
   function ownItem(user, itemId) {
@@ -213,8 +251,13 @@ export function createLogic(db, { admins = [] } = {}) {
 
   function updateItem(user, itemId, body) {
     const item = ownItem(user, itemId);
-    const it = parseItem({ article: body.article ?? item.article, price: body.price ?? item.price_cents / 100, qty: body.qty ?? item.qty });
-    q.itemUpdate.run(it.article, it.akey, it.price, it.qty, item.id);
+    const it = parseItem({
+      article: body.article ?? item.article,
+      variant: body.variant ?? item.variant,
+      price: body.price ?? item.price_cents / 100,
+      qty: body.qty ?? item.qty,
+    });
+    q.itemUpdate.run(it.article, it.akey, it.variant, it.vkey, it.price, it.qty, item.id);
     return item.round_id;
   }
 
@@ -236,7 +279,7 @@ export function createLogic(db, { admins = [] } = {}) {
     return r.id;
   }
 
-  function roundDetail(id, viewer = '', now = Date.now()) {
+  function roundDetail(id, viewer = '', now = Date.now(), { withPrices = true } = {}) {
     const r = getRound(id);
     const items = q.itemAll.all(r.id);
     const parts = q.partAll.all(r.id);
@@ -256,7 +299,7 @@ export function createLogic(db, { admins = [] } = {}) {
         user: display,
         done: st.done,
         paid: st.paid,
-        items: mine.map((i) => ({ id: i.id, article: i.article, price_cents: i.price_cents, qty: i.qty })),
+        items: mine.map((i) => ({ id: i.id, article: i.article, variant: i.variant, price_cents: i.price_cents, qty: i.qty })),
         subtotal_cents: subtotal,
         fee_cents: 0,
         total_cents: subtotal,
@@ -269,18 +312,29 @@ export function createLogic(db, { admins = [] } = {}) {
       u.total_cents = u.subtotal_cents + shares[i];
     });
 
+    // Zuletzt bekannter Preis aus früheren Runden desselben Restaurants (nie aus dieser Runde)
+    const known = new Map();
+    if (withPrices) {
+      for (const row of q.catalogRows.all(r.restaurant_id)) {
+        if (row.round_id !== r.id) known.set(`${row.akey}|${row.vkey}`, row.price_cents);
+      }
+    }
+
     const groupMap = new Map();
     for (const it of items) {
-      const key = `${it.akey}|${it.price_cents}`;
+      const key = `${it.akey}|${it.vkey}|${it.price_cents}`;
       let g = groupMap.get(key);
-      if (!g) groupMap.set(key, (g = { article: it.article, price_cents: it.price_cents, qty: 0, sum_cents: 0, users: new Map() }));
+      if (!g) groupMap.set(key, (g = { article: it.article, variant: it.variant, ak: `${it.akey}|${it.vkey}`, price_cents: it.price_cents, qty: 0, sum_cents: 0, users: new Map() }));
       g.qty += it.qty;
       g.sum_cents += it.price_cents * it.qty;
       g.users.set(it.user, (g.users.get(it.user) ?? 0) + it.qty);
     }
     const groups = [...groupMap.values()]
-      .map((g) => ({ ...g, users: [...g.users.entries()].map(([user, qty]) => ({ user, qty })) }))
-      .sort((a, b) => a.article.localeCompare(b.article, 'de'));
+      .map(({ ak, users: gu, ...g }) => {
+        const k = known.get(ak) ?? null;
+        return { ...g, users: [...gu.entries()].map(([user, qty]) => ({ user, qty })), known_price_cents: k, price_differs: k !== null && k !== g.price_cents };
+      })
+      .sort((a, b) => a.article.localeCompare(b.article, 'de') || a.variant.localeCompare(b.variant, 'de') || a.price_cents - b.price_cents);
 
     const withOrders = users.filter((u) => u.subtotal_cents > 0);
     const notReady = users.filter((u) => !u.done).map((u) => u.user);
@@ -318,7 +372,7 @@ export function createLogic(db, { admins = [] } = {}) {
   function listRounds(viewer = '', limit = 60) {
     const now = Date.now();
     return q.roundList.all(limit).map(({ id }) => {
-      const d = roundDetail(id, viewer, now);
+      const d = roundDetail(id, viewer, now, { withPrices: false });
       return {
         id: d.id,
         restaurant: d.restaurant.name,
@@ -335,6 +389,42 @@ export function createLogic(db, { admins = [] } = {}) {
         debts_users: d.debts.map((x) => x.user),
       };
     });
+  }
+
+  /**
+   * Katalog je Restaurant, gelernt aus bisherigen Bestellungen. Ein Name wird erst ab 2 Nutzungen vorgeschlagen,
+   * damit sich einmalige Tippfehler nicht festsetzen. Der Preis wird nur als Hinweis geliefert, nie automatisch gesetzt.
+   */
+  function catalog(roundId) {
+    const r = getRound(roundId);
+    const entries = new Map();
+    // Häufigste Schreibweise gewinnt; bei Gleichstand die zuletzt verwendete.
+    const top = (spell, last) => [...spell.entries()].sort((x, y) => y[1] - x[1] || (x[0] === last ? -1 : y[0] === last ? 1 : 0))[0][0];
+
+    for (const row of q.catalogRows.all(r.restaurant_id)) {
+      let e = entries.get(row.akey);
+      if (!e) entries.set(row.akey, (e = { spell: new Map(), last: row.article, uses: 0, variants: new Map() }));
+      e.spell.set(row.article, (e.spell.get(row.article) ?? 0) + 1);
+      e.last = row.article;
+      e.uses += 1;
+      let v = e.variants.get(row.vkey);
+      if (!v) e.variants.set(row.vkey, (v = { spell: new Map(), last: row.variant, count: 0, price_cents: null }));
+      v.spell.set(row.variant, (v.spell.get(row.variant) ?? 0) + 1);
+      v.last = row.variant;
+      v.count += 1;
+      v.price_cents = row.price_cents; // nach id sortiert → zuletzt gesetzter Preis
+    }
+    return [...entries.values()]
+      .filter((e) => e.uses >= 2)
+      .map((e) => ({
+        article: top(e.spell, e.last),
+        uses: e.uses,
+        variants: [...e.variants.values()]
+          .map((v) => ({ variant: top(v.spell, v.last), count: v.count, last_price_cents: v.price_cents }))
+          .sort((a, b) => b.count - a.count),
+      }))
+      .sort((a, b) => b.uses - a.uses || a.article.localeCompare(b.article, 'de'))
+      .slice(0, 300);
   }
 
   function stats(scope = 'all') {
@@ -416,6 +506,7 @@ export function createLogic(db, { admins = [] } = {}) {
     setFlag,
     roundDetail,
     listRounds,
+    catalog,
     stats,
   };
 }

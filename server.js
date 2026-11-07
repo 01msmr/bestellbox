@@ -98,6 +98,7 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
       emit(m[1]);
       return send(res, 200, logic.roundDetail(m[1], user));
     }
+    if (method === 'GET' && (m = p.match(/^\/api\/rounds\/(\d+)\/catalog$/))) return send(res, 200, logic.catalog(m[1]));
     if (method === 'POST' && (m = p.match(/^\/api\/rounds\/(\d+)\/items$/))) {
       const id = logic.addItem(user, m[1], await readJson(req));
       emit(m[1]);
