@@ -176,7 +176,7 @@ export function createLogic(db, { admins = [] } = {}) {
 
   function getRound(id) {
     const r = q.roundGet.get(Number(id));
-    if (!r) throw new HttpError(404, 'Runde nicht gefunden');
+    if (!r) throw new HttpError(404, 'Bestellung nicht gefunden');
     return r;
   }
 
@@ -245,7 +245,7 @@ export function createLogic(db, { admins = [] } = {}) {
   function addItem(user, roundId, body) {
     user = cleanUser(user);
     const r = getRound(roundId);
-    if (isLocked(r, Date.now())) throw new HttpError(423, 'Runde ist gesperrt');
+    if (isLocked(r, Date.now())) throw new HttpError(423, 'Bestellung ist gesperrt');
     const it = parseItem(body);
     q.partUpsert.run(r.id, user);
     return Number(q.itemInsert.run(r.id, user, it.article, it.akey, it.variant, it.vkey, it.price, it.qty).lastInsertRowid);
@@ -257,7 +257,7 @@ export function createLogic(db, { admins = [] } = {}) {
     if (!item) throw new HttpError(404, 'Position nicht gefunden');
     if (lower(item.user) !== lower(user)) throw new HttpError(403, 'Nur eigene Positionen');
     const r = getRound(item.round_id);
-    if (isLocked(r, Date.now())) throw new HttpError(423, 'Runde ist gesperrt');
+    if (isLocked(r, Date.now())) throw new HttpError(423, 'Bestellung ist gesperrt');
     return item;
   }
 

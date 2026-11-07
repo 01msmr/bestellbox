@@ -142,6 +142,63 @@ function parseMoney(v) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+// ---------- Sidebar (Bestellungen zum Springen, Statistik unten) ----------
+const sideEl = document.getElementById('side');
+const scrim = document.getElementById('scrim');
+const setSide = (open) => {
+  document.body.classList.toggle('side-open', open);
+  scrim.classList.toggle('hidden', !open);
+};
+document.getElementById('menu').addEventListener('click', () => setSide(!document.body.classList.contains('side-open')));
+scrim.addEventListener('click', () => setSide(false));
+
+let sideRounds = [];
+async function loadSide() {
+  if (!me) return;
+  const r = await api('GET', '/rounds').catch(() => null);
+  if (r) {
+    sideRounds = r;
+    renderSide();
+  }
+}
+function renderSide() {
+  const hash = location.hash || '#/';
+  const item = (r) =>
+    h(
+      'a',
+      { class: 'side-item' + (hash === `#/r/${r.id}` ? ' active' : ''), href: `#/r/${r.id}` },
+      h('div', null, r.restaurant),
+      h(
+        'div',
+        { class: 'sub' },
+        h('span', null, `${new Date(r.created_at).toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })} · ${r.creator}`),
+        r.unpaid
+          ? h('span', { class: 'badge off' }, eur(r.debts_total_cents))
+          : r.locked
+            ? h('span', null, t('gesperrt'))
+            : h('span', { class: 'badge on', 'data-expires': r.expires_at }, '…')
+      )
+    );
+  const group = (title, list) => (list.length ? [h('h4', null, title), ...list.map(item)] : []);
+  sideEl.replaceChildren(
+    h('a', { class: 'btn side-new', href: '#/' }, t('+ Neue Bestellung')),
+    ...group(t('Offen'), sideRounds.filter((r) => !r.locked)),
+    ...group(t('Unbezahlt'), sideRounds.filter((r) => r.unpaid)),
+    ...group(t('Abgeschlossen'), sideRounds.filter((r) => r.locked && !r.unpaid).slice(0, 10)),
+    h('div', { class: 'side-foot' }, h('a', { class: 'side-item' + (hash === '#/stats' ? ' active' : ''), href: '#/stats' }, t('📊 Statistik')))
+  );
+  tickCountdowns();
+}
+// Countdown-Badges (Sidebar und Startseite) – einmal global, nicht je Ansicht
+function tickCountdowns() {
+  for (const el of document.querySelectorAll('[data-expires]')) {
+    const left = Number(el.dataset.expires) - Date.now();
+    el.textContent = left > 0 ? `${t('noch')} ${fmtRemaining(left)}` : t('abgelaufen');
+    el.className = 'badge ' + (left > 0 ? (left < 120000 ? 'off' : 'on') : 'mid');
+  }
+}
+setInterval(tickCountdowns, 1000);
+
 // ---------- Router ----------
 let current = null;
 let refreshTimer;
@@ -150,6 +207,7 @@ function route() {
   current?.destroy?.();
   current = null;
   app.classList.remove('wide');
+  setSide(false);
   if (!me) {
     askName().then(route);
     return;
@@ -159,13 +217,17 @@ function route() {
   if ((m = hash.match(/^#\/r\/(\d+)$/))) current = roundView(Number(m[1]));
   else if (hash === '#/stats') current = statsView();
   else current = homeView();
+  loadSide();
   current.refresh();
 }
 window.addEventListener('hashchange', route);
 
 function scheduleRefresh() {
   clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(() => current?.refresh?.(), 150);
+  refreshTimer = setTimeout(() => {
+    current?.refresh?.();
+    loadSide();
+  }, 150);
 }
 const es = new EventSource('/api/events');
 es.onmessage = scheduleRefresh;
@@ -227,19 +289,19 @@ function homeView() {
     h('label', null, t('Bestellt von'), f.buyer),
     h('label', null, t('PayPal (Adresse/Link)'), f.paypal),
     h('label', null, t('Frist (Minuten)'), f.minutes),
-    h('div', { class: 'row', style: 'align-items:end' }, h('button', { class: 'btn', type: 'submit' }, t('Runde starten')))
+    h('div', { class: 'row', style: 'align-items:end' }, h('button', { class: 'btn', type: 'submit' }, t('Bestellung starten')))
   );
 
   const activeBox = h('div', { class: 'list' });
   const unpaidBox = h('div', { class: 'list' });
   const recentBox = h('div', { class: 'list' });
-  const unpaidCard = h('section', { class: 'card hidden' }, h('h2', null, t('💸 Unbezahlte Runden')), unpaidBox);
+  const unpaidCard = h('section', { class: 'card hidden home-lists' }, h('h2', null, t('💸 Unbezahlte Bestellungen')), unpaidBox);
 
   app.replaceChildren(
-    h('section', { class: 'card' }, h('details', { open: true }, h('summary', null, t('Neue Runde')), h('div', { style: 'margin-top:10px' }, form))),
-    h('section', { class: 'card' }, h('h2', null, t('Laufende Runden')), activeBox),
+    h('section', { class: 'card' }, h('details', { open: true }, h('summary', null, t('Neue Bestellung')), h('div', { style: 'margin-top:10px' }, form))),
+    h('section', { class: 'card home-lists' }, h('h2', null, t('Laufende Bestellungen')), activeBox),
     unpaidCard,
-    h('section', { class: 'card' }, h('h2', null, t('Letzte Runden')), recentBox)
+    h('section', { class: 'card home-lists' }, h('h2', null, t('Letzte Bestellungen')), recentBox)
   );
 
   const roundItem = (r) => {
@@ -266,15 +328,6 @@ function homeView() {
   const fill = (box, list, empty) =>
     box.replaceChildren(...(list.length ? list.map(roundItem) : [h('span', { class: 'muted' }, empty)]));
 
-  let skew = 0;
-  const tick = setInterval(() => {
-    for (const el of app.querySelectorAll('[data-expires]')) {
-      const left = Number(el.dataset.expires) - (Date.now() + skew);
-      el.textContent = left > 0 ? `${t('noch')} ${fmtRemaining(left)}` : t('abgelaufen');
-      el.className = 'badge ' + (left > 0 ? (left < 120000 ? 'off' : 'on') : 'mid');
-    }
-  }, 1000);
-
   return {
     async refresh() {
       const [rounds, rs] = await Promise.all([api('GET', '/rounds').catch(() => null), api('GET', '/restaurants').catch(() => null)]);
@@ -286,14 +339,12 @@ function homeView() {
       const active = rounds.filter((r) => !r.locked);
       const unpaid = rounds.filter((r) => r.unpaid);
       const recent = rounds.filter((r) => r.locked && !r.unpaid).slice(0, 10);
-      fill(activeBox, active, t('Keine laufende Runde.'));
+      fill(activeBox, active, t('Keine laufende Bestellung.'));
       fill(unpaidBox, unpaid, '');
       unpaidCard.classList.toggle('hidden', unpaid.length === 0);
       fill(recentBox, recent, t('Noch nichts abgeschlossen.'));
     },
-    destroy() {
-      clearInterval(tick);
-    },
+    destroy() {},
   };
 }
 
@@ -435,7 +486,7 @@ function roundView(id) {
     const editFee = h('input', { value: (d.delivery_fee_cents / 100).toFixed(2).replace('.', ','), inputmode: 'decimal' });
     head.replaceChildren(
       ...[
-      h('div', { class: 'row between' }, h('h2', { style: 'margin:0' }, d.restaurant.name), h('a', { href: '#/' }, t('← Alle Runden'))),
+      h('div', { class: 'row between' }, h('h2', { style: 'margin:0' }, d.restaurant.name), h('a', { href: '#/' }, t('← Alle Bestellungen'))),
       contactLinks(d.restaurant),
       h(
         'div',
@@ -448,7 +499,7 @@ function roundView(id) {
         ? h(
             'details',
             { style: 'margin-top:8px' },
-            h('summary', null, t('Runde bearbeiten')),
+            h('summary', null, t('Bestellung bearbeiten')),
             h(
               'form',
               {
@@ -472,7 +523,7 @@ function roundView(id) {
   }
 
   function renderTimerControls() {
-    timerLabel.textContent = d.locked ? t('Bestellfrist abgelaufen – Runde gesperrt') : t('Bestellfrist');
+    timerLabel.textContent = d.locked ? t('Bestellfrist abgelaufen – Bestellung gesperrt') : t('Bestellfrist');
     const buttons = [];
     if (d.viewer.can_manage) {
       buttons.push(h('button', { class: 'btn small', onclick: () => timeAction('extend', 5) }, '+5 min'));
@@ -490,13 +541,13 @@ function roundView(id) {
   function renderBanners() {
     const b = [];
     if (d.ready.total === 0) {
-      b.push(h('div', { class: 'banner warn' }, t('Noch keine Bestellungen – trag deine ein.')));
+      b.push(h('div', { class: 'banner warn' }, t('Noch keine Artikel – trag deine ein.')));
     } else if (d.ready.not_ready.length) {
       b.push(h('div', { class: 'banner warn' }, t('⚠ Noch nicht alle fertig ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
     } else {
       b.push(h('div', { class: 'banner ok' }, t('✓ Alle fertig ({total}/{total}) – kann bestellt werden', { total: d.ready.total })));
     }
-    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('💸 Runde unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
+    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('💸 Bestellung unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
     banners.replaceChildren(...b);
   }
 
@@ -540,7 +591,7 @@ function roundView(id) {
     for (const el of [inArticle, inVariant, inPrice, inQty, addBtn]) el.disabled = locked;
     const mineU = d.users.find((u) => lc(u.user) === lc(me));
     if (!mineU) {
-      mineList.replaceChildren(h('h3', null, t('Meine Bestellung')), h('div', { class: 'muted' }, locked ? t('Runde ist gesperrt.') : t('Noch nichts eingetragen.')));
+      mineList.replaceChildren(h('h3', null, t('Meine Artikel')), h('div', { class: 'muted' }, locked ? t('Bestellung ist gesperrt.') : t('Noch nichts eingetragen.')));
       return;
     }
     const stepper = (i, delta) =>
@@ -557,7 +608,7 @@ function roundView(id) {
         delta > 0 ? '+' : '−'
       );
     mineList.replaceChildren(
-      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Meine Bestellung')), h('div', { class: 'row' }, flagBadge(mineU, 'done'), lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
+      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Meine Artikel')), h('div', { class: 'row' }, flagBadge(mineU, 'done'), lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
       mineU.items.length
         ? h(
             'table',
@@ -614,7 +665,7 @@ function roundView(id) {
   function renderOrder() {
     const tel = telHref(d.restaurant.phone);
     orderPane.replaceChildren(
-      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Sammelbestellung')), contactLinks(d.restaurant)),
+      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Sammelliste')), contactLinks(d.restaurant)),
       d.groups.length
         ? h(
             'table',
@@ -674,7 +725,7 @@ function roundView(id) {
     const meU = d.users.find((u) => lc(u.user) === lc(me));
     const isBuyer = lc(me) === lc(d.buyer);
     const rows = [h('h3', null, t('💳 Bezahlen an {buyer}', { buyer: d.buyer }))];
-    if (!d.paypal_visible) rows.push(h('div', { class: 'muted' }, t('PayPal-Adresse ist nur für Teilnehmer der Runde sichtbar.')));
+    if (!d.paypal_visible) rows.push(h('div', { class: 'muted' }, t('PayPal-Adresse ist nur für Teilnehmer der Bestellung sichtbar.')));
     else if (!d.paypal) rows.push(h('div', { class: 'muted' }, t('Keine PayPal-Adresse hinterlegt.')));
     else {
       rows.push(
@@ -831,9 +882,9 @@ function statsView() {
         h(
           'section',
           { class: 'card grid3', style: 'grid-template-columns:1fr 1fr 1fr' },
-          h('div', null, h('div', { class: 'muted' }, t('Runden')), h('strong', null, String(s.rounds))),
+          h('div', null, h('div', { class: 'muted' }, t('Bestellungen')), h('strong', null, String(s.rounds))),
           h('div', null, h('div', { class: 'muted' }, t('Ø Preis Artikel')), h('strong', null, eur(s.avg_item_cents))),
-          h('div', null, h('div', { class: 'muted' }, t('Ø Bestellung/User')), h('strong', null, eur(s.avg_order_cents)))
+          h('div', null, h('div', { class: 'muted' }, t('Ø Betrag/User')), h('strong', null, eur(s.avg_order_cents)))
         ),
         h(
           'section',
@@ -842,7 +893,7 @@ function statsView() {
           h(
             'table',
             null,
-            h('thead', null, h('tr', null, h('th', null, 'Restaurant'), h('th', { class: 'num' }, t('Runden')), h('th', { class: 'num' }, t('Artikel')), h('th', null, t('Beliebtestes Gericht')))),
+            h('thead', null, h('tr', null, h('th', null, 'Restaurant'), h('th', { class: 'num' }, t('Bestellungen')), h('th', { class: 'num' }, t('Artikel')), h('th', null, t('Beliebtestes Gericht')))),
             h(
               'tbody',
               null,
