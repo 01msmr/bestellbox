@@ -1,0 +1,760 @@
+// bestellbox – Frontend (Vanilla JS, keine Build-Schritte)
+
+const app = document.getElementById('app');
+const whoBtn = document.getElementById('who');
+const toastEl = document.getElementById('toast');
+
+const eurFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+const eur = (c) => eurFmt.format((c ?? 0) / 100);
+const fmtDate = (ms) => new Date(ms).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+const lc = (s) => String(s ?? '').toLocaleLowerCase('de');
+
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props ?? {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'value') el.value = v;
+    else if (v === true) el.setAttribute(k, '');
+    else el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+
+let toastTimer;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+}
+
+// ---------- State & API ----------
+let me = localStorage.getItem('bb_user') ?? '';
+
+async function api(method, path, body) {
+  const res = await fetch('/api' + path, {
+    method,
+    headers: { 'content-type': 'application/json', 'x-user': encodeURIComponent(me) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+// Führt eine Aktion aus und zeigt Fehler als Toast.
+async function act(fn) {
+  try {
+    return await fn();
+  } catch (e) {
+    toast(e.message);
+    return null;
+  }
+}
+
+function setMe(name) {
+  me = name.trim().slice(0, 32);
+  localStorage.setItem('bb_user', me);
+  whoBtn.textContent = me ? `👤 ${me}` : 'Name wählen';
+}
+
+function askName() {
+  return new Promise((resolve) => {
+    const input = h('input', { placeholder: 'Dein Name', maxlength: 32, autofocus: true, value: me });
+    const form = h(
+      'form',
+      {
+        class: 'card',
+        onsubmit: (e) => {
+          e.preventDefault();
+          if (!input.value.trim()) return;
+          setMe(input.value);
+          resolve();
+        },
+      },
+      h('h2', null, 'Wie heißt du?'),
+      h('p', { class: 'muted' }, 'Der Name erscheint bei deinen Positionen. Gleicher Name = gleiche Person, bitte konsistent verwenden.'),
+      h('div', { class: 'row' }, h('div', { class: 'grow' }, input), h('button', { class: 'btn', type: 'submit' }, 'Los'))
+    );
+    app.replaceChildren(form);
+    input.focus();
+  });
+}
+
+whoBtn.addEventListener('click', async () => {
+  await askName();
+  route();
+});
+
+// ---------- Helpers ----------
+function webHref(u) {
+  if (!u) return null;
+  return /^https?:\/\//i.test(u) ? u : 'https://' + u;
+}
+function telHref(p) {
+  const d = String(p ?? '').replace(/[^\d+]/g, '');
+  return d ? 'tel:' + d : null;
+}
+function paypalHref(p) {
+  if (!p) return null;
+  if (/^https?:\/\//i.test(p)) return p;
+  if (/^[\w.-]+$/.test(p)) return 'https://paypal.me/' + p;
+  return null;
+}
+function contactLinks(r) {
+  const tel = telHref(r.phone);
+  const web = webHref(r.url);
+  return h(
+    'div',
+    { class: 'row' },
+    tel ? h('a', { href: tel }, '📞 ' + r.phone) : h('span', { class: 'muted' }, 'keine Telefonnummer'),
+    web ? h('a', { href: web, target: '_blank', rel: 'noopener noreferrer' }, '🌐 ' + r.url.replace(/^https?:\/\//i, '')) : null
+  );
+}
+function fmtRemaining(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  const p = (n) => String(n).padStart(2, '0');
+  return hh ? `${hh}:${p(mm)}:${p(ss)}` : `${p(mm)}:${p(ss)}`;
+}
+function parseMoney(v) {
+  const n = Number(String(v).trim().replace(',', '.'));
+  return Number.isFinite(n) ? n : NaN;
+}
+
+// ---------- Router ----------
+let current = null;
+let refreshTimer;
+
+function route() {
+  current?.destroy?.();
+  current = null;
+  if (!me) {
+    askName().then(route);
+    return;
+  }
+  const hash = location.hash || '#/';
+  let m;
+  if ((m = hash.match(/^#\/r\/(\d+)$/))) current = roundView(Number(m[1]));
+  else if (hash === '#/stats') current = statsView();
+  else current = homeView();
+  current.refresh();
+}
+window.addEventListener('hashchange', route);
+
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => current?.refresh?.(), 150);
+}
+const es = new EventSource('/api/events');
+es.onmessage = scheduleRefresh;
+es.onopen = scheduleRefresh;
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) scheduleRefresh();
+});
+
+// ---------- Home ----------
+function homeView() {
+  let restaurants = [];
+  const datalist = h('datalist', { id: 'rest-list' });
+  const f = {
+    name: h('input', { list: 'rest-list', placeholder: 'z. B. Pizza Roma', required: true, maxlength: 80, autocomplete: 'off' }),
+    url: h('input', { placeholder: 'https://…', maxlength: 300 }),
+    phone: h('input', { type: 'tel', placeholder: '07531 …', maxlength: 40 }),
+    buyer: h('input', { value: me, maxlength: 32, required: true }),
+    paypal: h('input', { value: localStorage.getItem('bb_paypal') ?? '', placeholder: 'paypal.me/name oder E-Mail', maxlength: 120 }),
+    fee: h('input', { inputmode: 'decimal', placeholder: '0,00' }),
+    minutes: h('input', { type: 'number', min: 1, max: 240, value: 20 }),
+  };
+  f.name.addEventListener('change', () => {
+    const r = restaurants.find((x) => lc(x.name) === lc(f.name.value.trim()));
+    if (r) {
+      f.url.value = r.url;
+      f.phone.value = r.phone;
+    }
+  });
+
+  const form = h(
+    'form',
+    {
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const fee = f.fee.value.trim() === '' ? 0 : parseMoney(f.fee.value);
+        const res = await act(() =>
+          api('POST', '/rounds', {
+            restaurant: { name: f.name.value, url: f.url.value, phone: f.phone.value },
+            buyer: f.buyer.value,
+            paypal: f.paypal.value,
+            delivery_fee: fee,
+            minutes: Number(f.minutes.value),
+          })
+        );
+        if (res) {
+          localStorage.setItem('bb_paypal', f.paypal.value);
+          location.hash = `#/r/${res.id}`;
+        }
+      },
+      class: 'grid2',
+    },
+    h('label', null, 'Restaurant', f.name, datalist),
+    h('label', null, 'Telefon', f.phone),
+    h('label', null, 'Webadresse', f.url),
+    h('label', null, 'Lieferkosten (€)', f.fee),
+    h('label', null, 'Bestellt von', f.buyer),
+    h('label', null, 'PayPal (Adresse/Link)', f.paypal),
+    h('label', null, 'Frist (Minuten)', f.minutes),
+    h('div', { class: 'row', style: 'align-items:end' }, h('button', { class: 'btn', type: 'submit' }, 'Runde starten'))
+  );
+
+  const activeBox = h('div', { class: 'list' });
+  const unpaidBox = h('div', { class: 'list' });
+  const recentBox = h('div', { class: 'list' });
+  const unpaidCard = h('section', { class: 'card hidden' }, h('h2', null, '💸 Unbezahlte Runden'), unpaidBox);
+
+  app.replaceChildren(
+    h('section', { class: 'card' }, h('details', { open: true }, h('summary', null, 'Neue Runde'), h('div', { style: 'margin-top:10px' }, form))),
+    h('section', { class: 'card' }, h('h2', null, 'Laufende Runden'), activeBox),
+    unpaidCard,
+    h('section', { class: 'card' }, h('h2', null, 'Letzte Runden'), recentBox)
+  );
+
+  const roundItem = (r) => {
+    const status = r.locked
+      ? h('span', { class: 'badge mid' }, 'gesperrt')
+      : h('span', { class: 'badge on', 'data-expires': r.expires_at }, '…');
+    return h(
+      'a',
+      { class: 'round-link', href: `#/r/${r.id}` },
+      h(
+        'div',
+        { class: 'card', style: 'padding:10px' },
+        h('div', { class: 'row between' }, h('strong', null, r.restaurant), status),
+        h('div', { class: 'muted' }, `${fmtDate(r.created_at)} · ${r.creator} · bestellt von ${r.buyer}`),
+        h(
+          'div',
+          { class: 'row between' },
+          h('span', null, `${r.done}/${r.users} fertig · ${eur(r.total_cents)}`),
+          r.unpaid ? h('span', { class: 'badge off' }, `unbezahlt: ${eur(r.debts_total_cents)}`) : null
+        )
+      )
+    );
+  };
+  const fill = (box, list, empty) =>
+    box.replaceChildren(...(list.length ? list.map(roundItem) : [h('span', { class: 'muted' }, empty)]));
+
+  let skew = 0;
+  const tick = setInterval(() => {
+    for (const el of app.querySelectorAll('[data-expires]')) {
+      const left = Number(el.dataset.expires) - (Date.now() + skew);
+      el.textContent = left > 0 ? `noch ${fmtRemaining(left)}` : 'abgelaufen';
+      el.className = 'badge ' + (left > 0 ? (left < 120000 ? 'off' : 'on') : 'mid');
+    }
+  }, 1000);
+
+  return {
+    async refresh() {
+      const [rounds, rs] = await Promise.all([api('GET', '/rounds').catch(() => null), api('GET', '/restaurants').catch(() => null)]);
+      if (rs) {
+        restaurants = rs;
+        datalist.replaceChildren(...rs.map((r) => h('option', { value: r.name })));
+      }
+      if (!rounds) return;
+      const active = rounds.filter((r) => !r.locked);
+      const unpaid = rounds.filter((r) => r.unpaid);
+      const recent = rounds.filter((r) => r.locked && !r.unpaid).slice(0, 10);
+      fill(activeBox, active, 'Keine laufende Runde.');
+      fill(unpaidBox, unpaid, '');
+      unpaidCard.classList.toggle('hidden', unpaid.length === 0);
+      fill(recentBox, recent, 'Noch nichts abgeschlossen.');
+    },
+    destroy() {
+      clearInterval(tick);
+    },
+  };
+}
+
+// ---------- Round ----------
+function roundView(id) {
+  let d = null;
+  let skew = 0;
+  let expiredRefreshed = false;
+  let tab = sessionStorage.getItem('bb_tab') || 'users';
+
+  const head = h('section', { class: 'card' });
+  const timerNum = h('div', { class: 'timer' }, '--:--');
+  const timerLabel = h('div', { class: 'muted' });
+  const timerBtns = h('div', { class: 'row' });
+  const timerCard = h('section', { class: 'card row between' }, h('div', null, timerLabel, timerNum), timerBtns);
+  const banners = h('div', { style: 'display:grid;gap:8px' });
+  const tabsEl = h('div', { class: 'tabs', role: 'tablist' });
+  const usersPane = h('div', { style: 'display:grid;gap:10px' });
+  const minePane = h('div', { style: 'display:grid;gap:10px' });
+  const orderPane = h('div', { class: 'card' });
+  const debtsCard = h('section', { class: 'card' });
+
+  // Persistente Eingabezeile (wird bei Live-Updates nicht neu gebaut)
+  const inArticle = h('input', { placeholder: 'Artikel', maxlength: 80, required: true, autocomplete: 'off' });
+  const inPrice = h('input', { placeholder: 'Preis €', inputmode: 'decimal', required: true });
+  const inQty = h('input', { type: 'number', min: 1, max: 99, value: 1 });
+  const addBtn = h('button', { class: 'btn', type: 'submit' }, 'Hinzufügen');
+  const addForm = h(
+    'form',
+    {
+      class: 'card',
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const ok = await act(() => api('POST', `/rounds/${id}/items`, { article: inArticle.value, price: parseMoney(inPrice.value), qty: Number(inQty.value) || 1 }));
+        if (ok) {
+          inArticle.value = '';
+          inPrice.value = '';
+          inQty.value = 1;
+          inArticle.focus();
+          current.refresh();
+        }
+      },
+    },
+    h('h3', null, 'Artikel eintragen'),
+    h('div', { class: 'grid3' }, h('label', null, 'Artikel', inArticle), h('label', null, 'Preis', inPrice), h('label', null, 'Menge', inQty)),
+    h('div', { style: 'margin-top:8px' }, addBtn)
+  );
+  const mineList = h('div', { class: 'card' });
+  minePane.append(addForm, mineList);
+
+  const panes = { users: usersPane, mine: minePane, order: orderPane };
+  const tabDefs = [
+    ['users', 'Nach Usern'],
+    ['mine', 'Meine'],
+    ['order', 'Bestellen'],
+  ];
+  function showTab(t) {
+    tab = t;
+    sessionStorage.setItem('bb_tab', t);
+    for (const [k, p] of Object.entries(panes)) p.classList.toggle('hidden', k !== t);
+    for (const b of tabsEl.children) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+  }
+  for (const [k, label] of tabDefs) tabsEl.append(h('button', { 'data-tab': k, role: 'tab', onclick: () => showTab(k) }, label));
+
+  app.replaceChildren(head, timerCard, banners, tabsEl, usersPane, minePane, orderPane, debtsCard);
+  showTab(tab);
+
+  const toggle = async (path, body) => {
+    await act(() => api('POST', `/rounds/${id}/${path}`, body));
+    current.refresh();
+  };
+
+  function flagBadge(u, flag) {
+    const on = u[flag];
+    const label = flag === 'done' ? (on ? '✓ fertig' : 'in Arbeit') : on ? '✓ bezahlt' : 'nicht bezahlt';
+    const cls = on ? 'on' : flag === 'done' ? 'mid' : 'off';
+    const editable = lc(u.user) === lc(me) || d.viewer.can_manage;
+    if (!editable) return h('span', { class: `badge ${cls}` }, label);
+    return h('button', { class: `badge ${cls}`, title: 'Umschalten', onclick: () => toggle(flag, { user: u.user, value: !on }) }, label);
+  }
+
+  function renderHead() {
+    const pp = d.paypal;
+    const ppLink = paypalHref(pp);
+    const editBuyer = h('input', { value: d.buyer, maxlength: 32 });
+    const editPaypal = h('input', { value: d.paypal, maxlength: 120 });
+    const editFee = h('input', { value: (d.delivery_fee_cents / 100).toFixed(2).replace('.', ','), inputmode: 'decimal' });
+    head.replaceChildren(
+      h('div', { class: 'row between' }, h('h2', { style: 'margin:0' }, d.restaurant.name), h('a', { href: '#/' }, '← Alle Runden')),
+      contactLinks(d.restaurant),
+      h(
+        'div',
+        { class: 'muted', style: 'margin-top:6px' },
+        `Gestartet ${fmtDate(d.created_at)} von ${d.creator} · bestellt von `,
+        h('strong', null, d.buyer),
+        ' · PayPal: ',
+        pp ? (ppLink ? h('a', { href: ppLink, target: '_blank', rel: 'noopener noreferrer' }, pp) : pp) : '—',
+        ` · Lieferkosten: ${eur(d.delivery_fee_cents)}`
+      ),
+      d.viewer.can_manage
+        ? h(
+            'details',
+            { style: 'margin-top:8px' },
+            h('summary', null, 'Runde bearbeiten'),
+            h(
+              'form',
+              {
+                class: 'grid2',
+                style: 'margin-top:8px',
+                onsubmit: async (e) => {
+                  e.preventDefault();
+                  await act(() => api('PATCH', `/rounds/${id}`, { buyer: editBuyer.value, paypal: editPaypal.value, delivery_fee: parseMoney(editFee.value) }));
+                  current.refresh();
+                },
+              },
+              h('label', null, 'Bestellt von', editBuyer),
+              h('label', null, 'PayPal', editPaypal),
+              h('label', null, 'Lieferkosten (€)', editFee),
+              h('div', { class: 'row', style: 'align-items:end' }, h('button', { class: 'btn small', type: 'submit' }, 'Speichern'))
+            )
+          )
+        : null
+    );
+  }
+
+  function renderTimerControls() {
+    timerLabel.textContent = d.locked ? 'Bestellfrist abgelaufen – Runde gesperrt' : 'Bestellfrist';
+    const buttons = [];
+    if (d.viewer.can_manage) {
+      buttons.push(h('button', { class: 'btn small', onclick: () => timeAction('extend', 5) }, '+5 min'));
+      if (!d.locked) buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('lock') }, 'Jetzt sperren'));
+      else buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('extend', 5) }, 'Wieder öffnen'));
+    }
+    timerBtns.replaceChildren(...buttons);
+  }
+  async function timeAction(action, minutes) {
+    await act(() => api('POST', `/rounds/${id}/time`, { action, minutes }));
+    expiredRefreshed = false;
+    current.refresh();
+  }
+
+  function renderBanners() {
+    const b = [];
+    if (d.ready.total === 0) {
+      b.push(h('div', { class: 'banner warn' }, 'Noch keine Bestellungen – trag deine ein.'));
+    } else if (d.ready.not_ready.length) {
+      b.push(h('div', { class: 'banner warn' }, `⚠ Noch nicht alle fertig (${d.ready.done}/${d.ready.total}): ${d.ready.not_ready.join(', ')}`));
+    } else {
+      b.push(h('div', { class: 'banner ok' }, `✓ Alle fertig (${d.ready.total}/${d.ready.total}) – kann bestellt werden`));
+    }
+    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, `💸 Runde unbezahlt: ${eur(d.debts_total_cents)} offen (${d.debts.map((x) => x.user).join(', ')})`));
+    banners.replaceChildren(...b);
+  }
+
+  function itemsTable(u) {
+    return h(
+      'table',
+      null,
+      h(
+        'tbody',
+        null,
+        u.items.map((i) => h('tr', null, h('td', { class: 'num' }, `${i.qty}×`), h('td', null, i.article), h('td', { class: 'num' }, eur(i.price_cents * i.qty))))
+      )
+    );
+  }
+
+  function renderUsers() {
+    if (!d.users.length) {
+      usersPane.replaceChildren(h('div', { class: 'card muted' }, 'Noch niemand dabei.'));
+      return;
+    }
+    usersPane.replaceChildren(
+      ...d.users.map((u) =>
+        h(
+          'section',
+          { class: `card user-card ${u.paid || lc(u.user) === lc(d.buyer) ? 'paid' : 'unpaid'}` },
+          h('div', { class: 'row between' }, h('strong', null, u.user + (lc(u.user) === lc(d.buyer) ? ' (Besteller)' : '')), h('div', { class: 'row' }, flagBadge(u, 'done'), lc(u.user) === lc(d.buyer) ? null : flagBadge(u, 'paid'))),
+          u.items.length ? itemsTable(u) : h('div', { class: 'muted' }, 'noch nichts'),
+          h(
+            'div',
+            { class: 'row between muted', style: 'margin-top:6px' },
+            h('span', null, `Artikel ${eur(u.subtotal_cents)}${u.fee_cents ? ` + Lieferanteil ${eur(u.fee_cents)}` : ''}`),
+            h('strong', { style: 'color:var(--fg)' }, eur(u.total_cents))
+          )
+        )
+      )
+    );
+  }
+
+  function renderMine() {
+    const locked = d.locked;
+    for (const el of [inArticle, inPrice, inQty, addBtn]) el.disabled = locked;
+    const mineU = d.users.find((u) => lc(u.user) === lc(me));
+    if (!mineU) {
+      mineList.replaceChildren(h('h3', null, 'Meine Bestellung'), h('div', { class: 'muted' }, locked ? 'Runde ist gesperrt.' : 'Noch nichts eingetragen.'));
+      return;
+    }
+    const stepper = (i, delta) =>
+      h(
+        'button',
+        {
+          class: 'btn small ghost',
+          disabled: locked || i.qty + delta < 1 || i.qty + delta > 99,
+          onclick: async () => {
+            await act(() => api('PATCH', `/items/${i.id}`, { qty: i.qty + delta }));
+            current.refresh();
+          },
+        },
+        delta > 0 ? '+' : '−'
+      );
+    mineList.replaceChildren(
+      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, 'Meine Bestellung'), h('div', { class: 'row' }, flagBadge(mineU, 'done'), lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
+      mineU.items.length
+        ? h(
+            'table',
+            null,
+            h(
+              'tbody',
+              null,
+              mineU.items.map((i) =>
+                h(
+                  'tr',
+                  null,
+                  h('td', null, i.article, h('div', { class: 'muted' }, `à ${eur(i.price_cents)}`)),
+                  h('td', { class: 'num' }, h('div', { class: 'row', style: 'justify-content:flex-end;flex-wrap:nowrap' }, stepper(i, -1), h('strong', null, String(i.qty)), stepper(i, 1))),
+                  h('td', { class: 'num' }, eur(i.price_cents * i.qty)),
+                  h(
+                    'td',
+                    null,
+                    h(
+                      'button',
+                      {
+                        class: 'btn small danger',
+                        disabled: locked,
+                        title: 'Entfernen',
+                        onclick: async () => {
+                          await act(() => api('DELETE', `/items/${i.id}`));
+                          current.refresh();
+                        },
+                      },
+                      '✕'
+                    )
+                  )
+                )
+              )
+            )
+          )
+        : h('div', { class: 'muted' }, 'Noch nichts eingetragen.'),
+      h(
+        'div',
+        { class: 'row between', style: 'margin-top:8px' },
+        h('span', { class: 'muted' }, `Artikel ${eur(mineU.subtotal_cents)}${mineU.fee_cents ? ` + Lieferanteil ${eur(mineU.fee_cents)}` : ''}`),
+        h('strong', null, `Summe ${eur(mineU.total_cents)}`)
+      ),
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted' }, 'Fertig = deine Bestellung ist komplett. Bezahlt = du hast dem Besteller dein Geld gegeben.'))
+    );
+  }
+
+  function orderText() {
+    const lines = [`Bestellung ${d.restaurant.name}`];
+    for (const g of d.groups) lines.push(`${g.qty}× ${g.article} (${eur(g.price_cents)})`);
+    lines.push('', `Summe Artikel: ${eur(d.items_total_cents)}`);
+    return lines.join('\n');
+  }
+
+  function renderOrder() {
+    const tel = telHref(d.restaurant.phone);
+    orderPane.replaceChildren(
+      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, 'Sammelbestellung'), contactLinks(d.restaurant)),
+      d.groups.length
+        ? h(
+            'table',
+            { style: 'margin-top:8px' },
+            h('thead', null, h('tr', null, h('th', { class: 'num' }, 'Menge'), h('th', null, 'Artikel'), h('th', { class: 'num' }, 'Einzel'), h('th', { class: 'num' }, 'Summe'))),
+            h(
+              'tbody',
+              null,
+              d.groups.map((g) =>
+                h(
+                  'tr',
+                  null,
+                  h('td', { class: 'num' }, `${g.qty}×`),
+                  h('td', null, g.article, h('div', { class: 'muted' }, g.users.map((x) => (x.qty > 1 ? `${x.user} ${x.qty}×` : x.user)).join(', '))),
+                  h('td', { class: 'num' }, eur(g.price_cents)),
+                  h('td', { class: 'num' }, eur(g.sum_cents))
+                )
+              )
+            ),
+            h(
+              'tfoot',
+              null,
+              h('tr', null, h('td', { colspan: 3 }, 'Artikel'), h('td', { class: 'num' }, eur(d.items_total_cents))),
+              d.delivery_fee_cents ? h('tr', null, h('td', { colspan: 3 }, 'Lieferkosten'), h('td', { class: 'num' }, eur(d.delivery_fee_cents))) : null,
+              h('tr', null, h('td', { colspan: 3 }, 'Gesamt'), h('td', { class: 'num' }, eur(d.grand_total_cents)))
+            )
+          )
+        : h('p', { class: 'muted' }, 'Noch keine Positionen.'),
+      h(
+        'div',
+        { class: 'row', style: 'margin-top:10px' },
+        h(
+          'button',
+          {
+            class: 'btn small',
+            onclick: async () => {
+              try {
+                await navigator.clipboard.writeText(orderText());
+                toast('Bestelltext kopiert');
+              } catch {
+                toast('Kopieren nicht möglich');
+              }
+            },
+          },
+          'Text kopieren'
+        ),
+        tel ? h('a', { class: 'btn small', style: 'text-decoration:none', href: tel }, 'Anrufen') : null
+      )
+    );
+  }
+
+  function renderDebts() {
+    const ppLink = paypalHref(d.paypal);
+    if (!d.users.some((u) => u.subtotal_cents > 0)) {
+      debtsCard.classList.add('hidden');
+      return;
+    }
+    debtsCard.classList.remove('hidden');
+    debtsCard.replaceChildren(
+      h('h3', null, d.locked ? 'Offene Beträge' : 'Offene Beträge (vorläufig)'),
+      d.debts.length
+        ? h(
+            'ul',
+            { class: 'list' },
+            d.debts.map((x) =>
+              h(
+                'li',
+                null,
+                h('span', null, x.user),
+                h(
+                  'span',
+                  { class: 'row' },
+                  h('strong', null, eur(x.amount_cents)),
+                  lc(x.user) === lc(me) || d.viewer.can_manage
+                    ? h('button', { class: 'btn small ghost', onclick: () => toggle('paid', { user: x.user, value: true }) }, 'bezahlt')
+                    : null
+                )
+              )
+            )
+          )
+        : h('div', { class: 'banner ok' }, '✓ Alles bezahlt'),
+      d.debts.length ? h('div', { class: 'muted', style: 'margin-top:8px' }, `Zahlen an ${d.buyer}`, d.paypal ? [' via PayPal: ', ppLink ? h('a', { href: ppLink, target: '_blank', rel: 'noopener noreferrer' }, d.paypal) : d.paypal] : '') : null
+    );
+  }
+
+  function updateTimer() {
+    if (!d) return;
+    const left = d.expires_at - (Date.now() + skew);
+    if (left <= 0) {
+      timerNum.textContent = 'GESPERRT';
+      timerNum.className = 'timer done';
+      if (!d.locked && !expiredRefreshed) {
+        expiredRefreshed = true;
+        current.refresh();
+      }
+    } else {
+      timerNum.textContent = fmtRemaining(left);
+      timerNum.className = 'timer' + (left < 120000 ? ' low' : '');
+    }
+  }
+  const tick = setInterval(updateTimer, 1000);
+
+  return {
+    async refresh() {
+      try {
+        d = await api('GET', `/rounds/${id}`);
+      } catch (e) {
+        app.replaceChildren(h('div', { class: 'card' }, h('p', null, e.message), h('a', { href: '#/' }, '← Zurück')));
+        clearInterval(tick);
+        return;
+      }
+      skew = d.server_now - Date.now();
+      renderHead();
+      renderTimerControls();
+      renderBanners();
+      renderUsers();
+      renderMine();
+      renderOrder();
+      renderDebts();
+      updateTimer();
+    },
+    destroy() {
+      clearInterval(tick);
+    },
+  };
+}
+
+// ---------- Statistik ----------
+function statsView() {
+  let scope = sessionStorage.getItem('bb_scope') || 'last30';
+  const body = h('div', { style: 'display:grid;gap:14px' });
+  const scopeBtns = h('div', { class: 'tabs' });
+  for (const [k, label] of [
+    ['last30', 'Letzte 30 Bestellungen'],
+    ['all', 'Alle'],
+  ]) {
+    scopeBtns.append(
+      h(
+        'button',
+        {
+          'data-scope': k,
+          onclick: () => {
+            scope = k;
+            sessionStorage.setItem('bb_scope', k);
+            current.refresh();
+          },
+        },
+        label
+      )
+    );
+  }
+  app.replaceChildren(h('h2', { style: 'margin:0' }, 'Statistik'), scopeBtns, body);
+
+  return {
+    async refresh() {
+      for (const b of scopeBtns.children) b.setAttribute('aria-selected', String(b.dataset.scope === scope));
+      const s = await act(() => api('GET', `/stats?scope=${scope}`));
+      if (!s) return;
+      if (!s.rounds) {
+        body.replaceChildren(h('div', { class: 'card muted' }, 'Noch keine Daten.'));
+        return;
+      }
+      body.replaceChildren(
+        h(
+          'section',
+          { class: 'card grid3', style: 'grid-template-columns:1fr 1fr 1fr' },
+          h('div', null, h('div', { class: 'muted' }, 'Runden'), h('strong', null, String(s.rounds))),
+          h('div', null, h('div', { class: 'muted' }, 'Ø Preis Artikel'), h('strong', null, eur(s.avg_item_cents))),
+          h('div', null, h('div', { class: 'muted' }, 'Ø Bestellung/User'), h('strong', null, eur(s.avg_order_cents)))
+        ),
+        h(
+          'section',
+          { class: 'card' },
+          h('h3', null, 'Restaurants'),
+          h(
+            'table',
+            null,
+            h('thead', null, h('tr', null, h('th', null, 'Restaurant'), h('th', { class: 'num' }, 'Runden'), h('th', { class: 'num' }, 'Artikel'), h('th', null, 'Beliebtestes Gericht'))),
+            h(
+              'tbody',
+              null,
+              s.restaurants.map((r) =>
+                h('tr', null, h('td', null, r.name), h('td', { class: 'num' }, String(r.rounds)), h('td', { class: 'num' }, String(r.items)), h('td', null, r.top_dish ? `${r.top_dish} (${r.top_dish_qty}×)` : '—'))
+              )
+            )
+          )
+        ),
+        h(
+          'section',
+          { class: 'card' },
+          h('h3', null, 'Pro User'),
+          h(
+            'table',
+            null,
+            h('thead', null, h('tr', null, h('th', null, 'User'), h('th', { class: 'num' }, 'Bestell.'), h('th', { class: 'num' }, 'Ø Artikel'), h('th', { class: 'num' }, 'Ø Bestellung'))),
+            h(
+              'tbody',
+              null,
+              s.users.map((u) => h('tr', null, h('td', null, u.user), h('td', { class: 'num' }, String(u.orders)), h('td', { class: 'num' }, eur(u.avg_item_cents)), h('td', { class: 'num' }, eur(u.avg_order_cents))))
+            )
+          )
+        )
+      );
+    },
+    destroy() {},
+  };
+}
+
+// ---------- Start ----------
+setMe(me);
+route();

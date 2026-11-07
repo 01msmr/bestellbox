@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>bestellbox</title>
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#/">bestellbox</a>
+    <nav>
+      <a href="#/">Runden</a>
+      <a href="#/stats">Statistik</a>
+    </nav>
+    <button id="who" class="chip" type="button" title="Username ändern"></button>
+    <details id="look" class="look">
+      <summary class="chip" title="Darstellung" aria-label="Darstellung"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="display:block"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></summary>
+      <div class="look-panel">
+        <div>
+          <h4>Modus</h4>
+          <div class="seg">
+            <button type="button" data-mode="auto">Auto</button>
+            <button type="button" data-mode="light">Hell</button>
+            <button type="button" data-mode="dark">Dunkel</button>
+          </div>
+        </div>
+        <div>
+          <h4>Farbe</h4>
+          <div class="swatches">
+            <button type="button" class="swatch" data-theme="mono"><i></i>S/W</button>
+            <button type="button" class="swatch" data-theme="ozean"><i></i>Ozean</button>
+            <button type="button" class="swatch" data-theme="beere"><i></i>Beere</button>
+          </div>
+        </div>
+      </div>
+    </details>
+  </header>
+  <main id="app"></main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

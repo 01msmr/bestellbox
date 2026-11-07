@@ -1,0 +1,175 @@
+import http from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { openDb, createLogic, HttpError } from './db.js';
+
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC = path.join(ROOT, 'public');
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
+};
+
+export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
+  const db = openDb(dbFile);
+  const logic = createLogic(db, { admins });
+  const clients = new Set();
+
+  const emit = (roundId) => {
+    const msg = `data: ${JSON.stringify({ type: 'change', roundId: roundId ?? null })}\n\n`;
+    for (const res of clients) res.write(msg);
+  };
+
+  const heartbeat = setInterval(() => {
+    for (const res of clients) res.write(': ping\n\n');
+  }, 25000);
+  heartbeat.unref();
+
+  async function readJson(req) {
+    const chunks = [];
+    let size = 0;
+    for await (const c of req) {
+      size += c.length;
+      if (size > 64 * 1024) throw new HttpError(413, 'Zu groß');
+      chunks.push(c);
+    }
+    if (!chunks.length) return {};
+    try {
+      return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } catch {
+      throw new HttpError(400, 'Ungültiges JSON');
+    }
+  }
+
+  const viewerOf = (req) => {
+    const raw = req.headers['x-user'];
+    if (!raw) return '';
+    try {
+      return decodeURIComponent(String(raw)).trim().slice(0, 32);
+    } catch {
+      return '';
+    }
+  };
+
+  const send = (res, status, body) => {
+    const data = JSON.stringify(body);
+    res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(data);
+  };
+
+  async function api(req, res, url) {
+    const user = viewerOf(req);
+    const method = req.method;
+    const p = url.pathname;
+    let m;
+
+    if (method === 'GET' && p === '/api/events') {
+      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+      res.write('retry: 2000\n\n');
+      clients.add(res);
+      req.on('close', () => clients.delete(res));
+      return;
+    }
+    if (method === 'GET' && p === '/api/me') return send(res, 200, { user, is_admin: user ? logic.isAdmin(user) : false });
+    if (method === 'GET' && p === '/api/restaurants') return send(res, 200, logic.restaurants());
+    if (method === 'GET' && p === '/api/stats') return send(res, 200, logic.stats(url.searchParams.get('scope') === 'last30' ? 'last30' : 'all'));
+    if (method === 'GET' && p === '/api/rounds') return send(res, 200, logic.listRounds(user));
+    if (method === 'POST' && p === '/api/rounds') {
+      const id = logic.createRound(user, await readJson(req));
+      emit(id);
+      return send(res, 201, { id });
+    }
+    if ((m = p.match(/^\/api\/rounds\/(\d+)$/))) {
+      if (method === 'GET') return send(res, 200, logic.roundDetail(m[1], user));
+      if (method === 'PATCH') {
+        logic.updateRound(user, m[1], await readJson(req));
+        emit(m[1]);
+        return send(res, 200, logic.roundDetail(m[1], user));
+      }
+    }
+    if (method === 'POST' && (m = p.match(/^\/api\/rounds\/(\d+)\/time$/))) {
+      logic.changeTime(user, m[1], await readJson(req));
+      emit(m[1]);
+      return send(res, 200, logic.roundDetail(m[1], user));
+    }
+    if (method === 'POST' && (m = p.match(/^\/api\/rounds\/(\d+)\/items$/))) {
+      const id = logic.addItem(user, m[1], await readJson(req));
+      emit(m[1]);
+      return send(res, 201, { id });
+    }
+    if (method === 'POST' && (m = p.match(/^\/api\/rounds\/(\d+)\/(done|paid)$/))) {
+      logic.setFlag(user, m[1], m[2], await readJson(req));
+      emit(m[1]);
+      return send(res, 200, logic.roundDetail(m[1], user));
+    }
+    if ((m = p.match(/^\/api\/items\/(\d+)$/))) {
+      if (method === 'PATCH') {
+        const rid = logic.updateItem(user, m[1], await readJson(req));
+        emit(rid);
+        return send(res, 200, { ok: true });
+      }
+      if (method === 'DELETE') {
+        const rid = logic.deleteItem(user, m[1]);
+        emit(rid);
+        return send(res, 200, { ok: true });
+      }
+    }
+    throw new HttpError(404, 'Nicht gefunden');
+  }
+
+  async function serveStatic(res, pathname) {
+    const rel = pathname === '/' ? 'index.html' : pathname.slice(1);
+    const file = path.normalize(path.join(PUBLIC, rel));
+    if (!file.startsWith(PUBLIC + path.sep)) throw new HttpError(404, 'Nicht gefunden');
+    try {
+      const data = await readFile(file);
+      res.writeHead(200, { 'content-type': MIME[path.extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-cache' });
+      res.end(data);
+    } catch {
+      throw new HttpError(404, 'Nicht gefunden');
+    }
+  }
+
+  const server = http.createServer(async (req, res) => {
+    try {
+      const url = new URL(req.url, 'http://localhost');
+      if (url.pathname.startsWith('/api/')) await api(req, res, url);
+      else if (req.method === 'GET' || req.method === 'HEAD') await serveStatic(res, url.pathname);
+      else throw new HttpError(405, 'Methode nicht erlaubt');
+    } catch (err) {
+      if (res.headersSent) return res.end();
+      const status = err instanceof HttpError ? err.status : 500;
+      if (status === 500) console.error(err);
+      send(res, status, { error: err instanceof HttpError ? err.message : 'Interner Fehler' });
+    }
+  });
+
+  server.on('close', () => {
+    clearInterval(heartbeat);
+    for (const res of clients) res.end();
+    db.close();
+  });
+  return server;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const port = Number(process.env.PORT ?? 3000);
+  const host = process.env.HOST ?? '127.0.0.1';
+  const admins = (process.env.ADMINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const dbFile = process.env.DB_FILE ?? './data/bestellbox.db';
+  if (dbFile !== ':memory:') mkdirSync(path.dirname(path.resolve(dbFile)), { recursive: true });
+  const server = createApp({ dbFile, admins });
+  server.listen(port, host, () => console.log(`bestellbox läuft auf http://${host}:${port}`));
+  const stop = () => {
+    server.closeAllConnections?.();
+    server.close(() => process.exit(0));
+  };
+  process.on('SIGINT', stop);
+  process.on('SIGTERM', stop);
+}

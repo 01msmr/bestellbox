@@ -1,0 +1,114 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createApp } from '../server.js';
+
+async function boot(opts = {}) {
+  const server = createApp({ admins: ['root'], ...opts });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = async (method, path, user, body) => {
+    const res = await fetch(base + path, {
+      method,
+      headers: { 'content-type': 'application/json', ...(user ? { 'x-user': encodeURIComponent(user) } : {}) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: res.status, body: await res.json() };
+  };
+  return { server, call, close: () => new Promise((r) => { server.closeAllConnections(); server.close(r); }) };
+}
+
+test('Runde: Gruppierung, Liefergebühr, Schulden, Rechte', async () => {
+  const { call, close } = await boot();
+  try {
+    const mk = await call('POST', '/api/rounds', 'uli', {
+      restaurant: { name: 'Pizza Roma', url: 'https://roma.example', phone: '07531 123' },
+      paypal: 'uli',
+      delivery_fee: '3,00',
+      minutes: 20,
+    });
+    assert.equal(mk.status, 201);
+    const id = mk.body.id;
+
+    await call('POST', `/api/rounds/${id}/items`, 'uli', { article: 'Margherita', price: '8,50', qty: 1 });
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: '  margherita ', price: 8.5, qty: 2 });
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cola', price: '2,50', qty: 1 });
+
+    let d = (await call('GET', `/api/rounds/${id}`, 'uli')).body;
+    const g = d.groups.find((x) => x.article.toLowerCase().trim() === 'margherita');
+    assert.equal(g.qty, 3, 'gleiche Artikel gruppiert');
+    assert.equal(d.items_total_cents, 3 * 850 + 250);
+    assert.equal(d.users.reduce((a, u) => a + u.fee_cents, 0), 300, 'Liefergebühr komplett verteilt');
+    assert.equal(d.ready.done, 0);
+    assert.deepEqual(d.ready.not_ready.sort(), ['anna', 'uli']);
+
+    // Fremde Position nicht änderbar
+    const annaItem = d.users.find((u) => u.user === 'anna').items[0].id;
+    assert.equal((await call('PATCH', `/api/items/${annaItem}`, 'uli', { qty: 5 })).status, 403);
+    assert.equal((await call('PATCH', `/api/items/${annaItem}`, 'anna', { qty: 3 })).status, 200);
+
+    // Fertig/Bezahlt unabhängig
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    d = (await call('GET', `/api/rounds/${id}`, 'anna')).body;
+    const anna = d.users.find((u) => u.user === 'anna');
+    assert.equal(anna.done, true);
+    assert.equal(anna.paid, false);
+    assert.equal((await call('POST', `/api/rounds/${id}/paid`, 'uli', { user: 'anna', value: true })).status, 200, 'Besteller darf bezahlt setzen');
+    assert.equal((await call('POST', `/api/rounds/${id}/paid`, 'bob', { user: 'anna', value: false })).status, 403);
+
+    // Sperre per Ablauf
+    assert.equal((await call('POST', `/api/rounds/${id}/time`, 'anna', { action: 'lock' })).status, 403);
+    assert.equal((await call('POST', `/api/rounds/${id}/time`, 'root', { action: 'lock' })).status, 200);
+    assert.equal((await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Tiramisu', price: 4, qty: 1 })).status, 423);
+
+    d = (await call('GET', `/api/rounds/${id}`, 'uli')).body;
+    assert.equal(d.locked, true);
+    assert.equal(d.debts.length, 0, 'Besteller schuldet sich nichts, anna hat bezahlt');
+    assert.equal(d.unpaid, false);
+
+    // Wieder öffnen
+    const re = await call('POST', `/api/rounds/${id}/time`, 'uli', { action: 'extend', minutes: 5 });
+    assert.equal(re.body.locked, false);
+
+    // Restaurant gespeichert
+    const rs = (await call('GET', '/api/restaurants')).body;
+    assert.equal(rs[0].phone, '07531 123');
+  } finally {
+    await close();
+  }
+});
+
+test('Unbezahlte Runde und Statistik', async () => {
+  const { call, close } = await boot();
+  try {
+    const id = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Burger Hub' } })).body.id;
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cheeseburger', price: 9, qty: 2 });
+    await call('POST', `/api/rounds/${id}/items`, 'bob', { article: 'Cheeseburger', price: 9, qty: 1 });
+    await call('POST', `/api/rounds/${id}/time`, 'uli', { action: 'lock' });
+
+    const list = (await call('GET', '/api/rounds', 'uli')).body;
+    assert.equal(list[0].unpaid, true);
+    assert.deepEqual(list[0].debts_users.sort(), ['anna', 'bob']);
+
+    const st = (await call('GET', '/api/stats?scope=last30', 'uli')).body;
+    assert.equal(st.restaurants[0].name, 'Burger Hub');
+    assert.equal(st.restaurants[0].top_dish, 'Cheeseburger');
+    assert.equal(st.avg_item_cents, 900);
+    assert.equal(st.users.find((u) => u.user === 'anna').avg_order_cents, 1800);
+  } finally {
+    await close();
+  }
+});
+
+test('Validierung', async () => {
+  const { call, close } = await boot();
+  try {
+    assert.equal((await call('POST', '/api/rounds', '', { restaurant: { name: 'X' } })).status, 400);
+    const id = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'X' } })).body.id;
+    assert.equal((await call('POST', `/api/rounds/${id}/items`, 'uli', { article: '', price: 1 })).status, 400);
+    assert.equal((await call('POST', `/api/rounds/${id}/items`, 'uli', { article: 'a', price: -1 })).status, 400);
+    assert.equal((await call('POST', `/api/rounds/${id}/items`, 'uli', { article: 'a', price: 1, qty: 0 })).status, 400);
+    assert.equal((await call('GET', '/api/rounds/999', 'uli')).status, 404);
+  } finally {
+    await close();
+  }
+});

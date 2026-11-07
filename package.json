@@ -1,0 +1,13 @@
+{
+  "name": "bestellbox",
+  "version": "0.1.0",
+  "description": "Gemeinsame Essensbestellung für die Toolbox: Runden, Sammelliste, fertig/bezahlt-Status, Live-Updates.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --no-warnings server.js",
+    "dev": "node --no-warnings --watch server.js",
+    "test": "node --no-warnings --test test/*.test.js"
+  }
+}
