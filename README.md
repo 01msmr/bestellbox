@@ -18,6 +18,10 @@ alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt
 - **Frist** (Standard 20 min, beim Anlegen einstellbar, `+5 min`). Nach Ablauf ist die Runde gesperrt;
   Ersteller, Besteller und Admins können sie wieder öffnen.
 - **Bestellt von** + PayPal-Adresse/Link und **Lieferkosten** (anteilig nach Artikelsumme verteilt).
+- **Bezahlen:** Block mit PayPal-Adresse des Bestellers (kopierbar) und, bei paypal.me-Adressen, einem Link mit dem
+  eigenen Betrag. PayPal-Adresse (je Besteller) und Lieferkosten (je Restaurant) werden gemerkt und bei der nächsten
+  Runde vorgeschlagen. Die Adresse erscheint nie in Listen, nur in der Runde für Teilnehmer, Besteller, Ersteller und Admins.
+- **Layout:** mobil einspaltig, Tablet breiter, Desktop zweispaltig (links Tabs, rechts Frist/Banner/Bezahlen).
 - **Offene Beträge:** eine Zeile pro User. Runden mit offenen Beträgen erscheinen separat als *unbezahlt*.
 - **Statistik** (letzte 30 / alle): meistbestelltes Restaurant, beliebtestes Gericht je Restaurant,
   Ø Artikelpreis und Ø Bestellsumme. Es gibt bewusst keine Auswertung nach einzelnen Usern.
@@ -46,5 +50,6 @@ Docker: `docker compose up -d` (Daten im Volume `bestellbox-data`).
 
 ## Hinweis zur Sicherheit
 
-Es gibt bewusst **keine Anmeldung**: Der Username kommt vom Browser und wird vertraut. Das ist für ein
+Es gibt bewusst **keine Anmeldung**: Der Username kommt vom Browser und wird vertraut. Der „Schutz“ der PayPal-Adresse
+ist daher nur eine Sichtbarkeitsbeschränkung (kein Login, wer sich als Teilnehmer ausgibt, sieht sie). Das ist für ein
 vertrauenswürdiges Netz (lokal/Toolbox-LAN) gedacht. Nicht ungeschützt ins Internet stellen.

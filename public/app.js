@@ -103,11 +103,14 @@ function telHref(p) {
   const d = String(p ?? '').replace(/[^\d+]/g, '');
   return d ? 'tel:' + d : null;
 }
-function paypalHref(p) {
-  if (!p) return null;
-  if (/^https?:\/\//i.test(p)) return p;
-  if (/^[\w.-]+$/.test(p)) return 'https://paypal.me/' + p;
-  return null;
+// PayPal-Link mit Betrag (nur für paypal.me-Adressen möglich; E-Mail-Adressen werden nur angezeigt)
+function payHref(addr, cents) {
+  const a = String(addr ?? '').trim();
+  let base = null;
+  if (/^https?:\/\/(www\.)?paypal\.me\/[\w.-]+\/?$/i.test(a)) base = a.replace(/\/$/, '');
+  else if (/^(www\.)?paypal\.me\/[\w.-]+\/?$/i.test(a)) base = 'https://' + a.replace(/\/$/, '');
+  else if (/^[\w.-]+$/.test(a)) base = 'https://paypal.me/' + a;
+  return base ? `${base}/${(cents / 100).toFixed(2)}EUR` : null;
 }
 function contactLinks(r) {
   const tel = telHref(r.phone);
@@ -146,6 +149,7 @@ let refreshTimer;
 function route() {
   current?.destroy?.();
   current = null;
+  app.classList.remove('wide');
   if (!me) {
     askName().then(route);
     return;
@@ -179,7 +183,7 @@ function homeView() {
     url: h('input', { placeholder: 'https://…', maxlength: 300 }),
     phone: h('input', { type: 'tel', placeholder: '07531 …', maxlength: 40 }),
     buyer: h('input', { value: me, maxlength: 32, required: true }),
-    paypal: h('input', { value: localStorage.getItem('bb_paypal') ?? '', placeholder: t('paypal.me/name oder E-Mail'), maxlength: 120 }),
+    paypal: h('input', { value: '', placeholder: t('paypal.me/name oder E-Mail'), maxlength: 120 }),
     fee: h('input', { inputmode: 'decimal', placeholder: '0,00' }),
     minutes: h('input', { type: 'number', min: 1, max: 240, value: 20 }),
   };
@@ -188,8 +192,12 @@ function homeView() {
     if (r) {
       f.url.value = r.url;
       f.phone.value = r.phone;
+      if (!f.fee.value && r.last_delivery_fee_cents) f.fee.value = (r.last_delivery_fee_cents / 100).toFixed(2).replace('.', ',');
     }
   });
+  api('GET', '/me/paypal').then((r) => {
+    if (r.paypal && !f.paypal.value) f.paypal.value = r.paypal;
+  }).catch(() => {});
 
   const form = h(
     'form',
@@ -207,7 +215,6 @@ function homeView() {
           })
         );
         if (res) {
-          localStorage.setItem('bb_paypal', f.paypal.value);
           location.hash = `#/r/${res.id}`;
         }
       },
@@ -309,6 +316,7 @@ function roundView(id) {
   const minePane = h('div', { style: 'display:grid;gap:10px' });
   const orderPane = h('div', { class: 'card' });
   const debtsCard = h('section', { class: 'card' });
+  const payCard = h('section', { class: 'card pay hidden' });
 
   // Persistente Eingabezeile (wird bei Live-Updates nicht neu gebaut)
   const inArticle = h('input', { placeholder: t('Artikel'), maxlength: 80, required: true, autocomplete: 'off' });
@@ -399,7 +407,12 @@ function roundView(id) {
   }
   for (const [k, label] of tabDefs) tabsEl.append(h('button', { 'data-tab': k, role: 'tab', onclick: () => showTab(k) }, label));
 
-  app.replaceChildren(head, timerCard, banners, tabsEl, usersPane, minePane, orderPane, debtsCard);
+  // Mobil untereinander; ab Desktop-Breite: links Tabs, rechts Frist/Banner/Bezahlen (siehe style.css)
+  app.classList.add('wide');
+  head.classList.add('round-head');
+  app.replaceChildren(
+    h('div', { class: 'round-grid' }, head, h('div', { class: 'round-side' }, timerCard, banners, payCard), h('div', { class: 'round-main' }, tabsEl, usersPane, minePane, orderPane, debtsCard))
+  );
   showTab(tab);
 
   const toggle = async (path, body) => {
@@ -417,8 +430,6 @@ function roundView(id) {
   }
 
   function renderHead() {
-    const pp = d.paypal;
-    const ppLink = paypalHref(pp);
     const editBuyer = h('input', { value: d.buyer, maxlength: 32 });
     const editPaypal = h('input', { value: d.paypal, maxlength: 120 });
     const editFee = h('input', { value: (d.delivery_fee_cents / 100).toFixed(2).replace('.', ','), inputmode: 'decimal' });
@@ -431,8 +442,6 @@ function roundView(id) {
         { class: 'muted', style: 'margin-top:6px' },
         t('Gestartet {date} von {creator} · bestellt von ', { date: fmtDate(d.created_at), creator: d.creator }),
         h('strong', null, d.buyer),
-        ' · PayPal: ',
-        pp ? (ppLink ? h('a', { href: ppLink, target: '_blank', rel: 'noopener noreferrer' }, pp) : pp) : '—',
         t(' · Lieferkosten: {fee}', { fee: eur(d.delivery_fee_cents) })
       ),
       d.viewer.can_manage
@@ -658,8 +667,53 @@ function roundView(id) {
     );
   }
 
+  function renderPay() {
+    const hasOrders = d.users.some((u) => u.subtotal_cents > 0);
+    payCard.classList.toggle('hidden', !hasOrders);
+    if (!hasOrders) return;
+    const meU = d.users.find((u) => lc(u.user) === lc(me));
+    const isBuyer = lc(me) === lc(d.buyer);
+    const rows = [h('h3', null, t('💳 Bezahlen an {buyer}', { buyer: d.buyer }))];
+    if (!d.paypal_visible) rows.push(h('div', { class: 'muted' }, t('PayPal-Adresse ist nur für Teilnehmer der Runde sichtbar.')));
+    else if (!d.paypal) rows.push(h('div', { class: 'muted' }, t('Keine PayPal-Adresse hinterlegt.')));
+    else {
+      rows.push(
+        h(
+          'div',
+          { class: 'row between' },
+          h('strong', { class: 'payaddr' }, d.paypal),
+          h(
+            'button',
+            {
+              class: 'btn small ghost',
+              onclick: async () => {
+                try {
+                  await navigator.clipboard.writeText(d.paypal);
+                  toast(t('Adresse kopiert'));
+                } catch {
+                  toast(t('Kopieren nicht möglich'));
+                }
+              },
+            },
+            t('Kopieren')
+          )
+        )
+      );
+    }
+    if (isBuyer) rows.push(h('div', { class: 'muted' }, t('Du bist Besteller – die anderen zahlen an dich.')));
+    else if (meU && meU.subtotal_cents > 0 && meU.paid) rows.push(h('div', { class: 'banner ok' }, t('✓ Du hast bezahlt')));
+    else if (meU && meU.subtotal_cents > 0) {
+      const href = d.paypal ? payHref(d.paypal, meU.total_cents) : null;
+      rows.push(
+        href
+          ? h('a', { class: 'btn', href, target: '_blank', rel: 'noopener noreferrer' }, t('{amount} per PayPal zahlen', { amount: eur(meU.total_cents) }))
+          : h('div', { class: 'muted' }, t('Dein Betrag: {amount}', { amount: eur(meU.total_cents) }))
+      );
+    }
+    payCard.replaceChildren(...rows);
+  }
+
   function renderDebts() {
-    const ppLink = paypalHref(d.paypal);
     if (!d.users.some((u) => u.subtotal_cents > 0)) {
       debtsCard.classList.add('hidden');
       return;
@@ -687,8 +741,7 @@ function roundView(id) {
               )
             )
           )
-        : h('div', { class: 'banner ok' }, t('✓ Alles bezahlt')),
-      d.debts.length ? h('div', { class: 'muted', style: 'margin-top:8px' }, t('Zahlen an {buyer}', { buyer: d.buyer }), d.paypal ? [t(' via PayPal: '), ppLink ? h('a', { href: ppLink, target: '_blank', rel: 'noopener noreferrer' }, d.paypal) : d.paypal] : '') : null
+        : h('div', { class: 'banner ok' }, t('✓ Alles bezahlt'))
     );
   }
 
@@ -729,6 +782,7 @@ function roundView(id) {
       renderUsers();
       renderMine();
       renderOrder();
+      renderPay();
       renderDebts();
       updateTimer();
     },

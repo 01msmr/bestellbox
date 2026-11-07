@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS items (
   price_cents INTEGER NOT NULL,
   qty INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS payment_profiles (
+  user_key TEXT PRIMARY KEY,
+  paypal TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS items_round ON items(round_id);
 CREATE INDEX IF NOT EXISTS rounds_created ON rounds(created_at);
 `;
@@ -121,7 +125,13 @@ export function createLogic(db, { admins = [] } = {}) {
     restByKey: db.prepare('SELECT * FROM restaurants WHERE name_key = ?'),
     restInsert: db.prepare('INSERT INTO restaurants (name, name_key, url, phone) VALUES (?, ?, ?, ?)'),
     restUpdate: db.prepare('UPDATE restaurants SET url = ?, phone = ? WHERE id = ?'),
-    restAll: db.prepare('SELECT id, name, url, phone FROM restaurants ORDER BY name COLLATE NOCASE'),
+    restAll: db.prepare(
+      `SELECT s.id, s.name, s.url, s.phone,
+        (SELECT r.delivery_fee_cents FROM rounds r WHERE r.restaurant_id = s.id ORDER BY r.id DESC LIMIT 1) AS last_delivery_fee_cents
+       FROM restaurants s ORDER BY s.name COLLATE NOCASE`
+    ),
+    profGet: db.prepare('SELECT paypal FROM payment_profiles WHERE user_key = ?'),
+    profSet: db.prepare('INSERT INTO payment_profiles (user_key, paypal) VALUES (?, ?) ON CONFLICT(user_key) DO UPDATE SET paypal = excluded.paypal'),
     roundInsert: db.prepare(
       'INSERT INTO rounds (restaurant_id, creator, buyer, paypal, delivery_fee_cents, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ),
@@ -176,12 +186,13 @@ export function createLogic(db, { admins = [] } = {}) {
     user = cleanUser(user);
     const restaurantId = upsertRestaurant(body.restaurant ?? {});
     const buyer = cleanUser(body.buyer || user);
-    const paypal = collapse(body.paypal).slice(0, 120);
+    const paypal = collapse(body.paypal).slice(0, 120) || (q.profGet.get(lower(buyer))?.paypal ?? '');
     const fee = body.delivery_fee === undefined || body.delivery_fee === '' ? 0 : parseMoneyToCents(body.delivery_fee, { max: 100 });
     const minutes = body.minutes === undefined || body.minutes === '' ? 20 : Number(body.minutes);
     if (!Number.isFinite(minutes) || minutes < 1 || minutes > 240) throw new HttpError(400, 'Ablaufzeit 1–240 Minuten');
     const now = Date.now();
     const id = Number(q.roundInsert.run(restaurantId, user, buyer, paypal, fee, now, now + minutes * 60000).lastInsertRowid);
+    if (paypal) q.profSet.run(lower(buyer), paypal);
     return id;
   }
 
@@ -193,6 +204,7 @@ export function createLogic(db, { admins = [] } = {}) {
     const paypal = body.paypal !== undefined ? collapse(body.paypal).slice(0, 120) : r.paypal;
     const fee = body.delivery_fee !== undefined ? parseMoneyToCents(body.delivery_fee, { max: 100 }) : r.delivery_fee_cents;
     q.roundUpdate.run(buyer, paypal, fee, r.id);
+    if (paypal) q.profSet.run(lower(buyer), paypal);
   }
 
   function changeTime(user, id, { action, minutes }) {
@@ -336,6 +348,8 @@ export function createLogic(db, { admins = [] } = {}) {
       })
       .sort((a, b) => a.article.localeCompare(b.article, 'de') || a.variant.localeCompare(b.variant, 'de') || a.price_cents - b.price_cents);
 
+    // Bezahladresse nur für Teilnehmer der Runde, Besteller, Ersteller und Admins – nie in Listen.
+    const canSeePay = !!viewer && (canManage(r, viewer) || names.has(lower(viewer)));
     const withOrders = users.filter((u) => u.subtotal_cents > 0);
     const notReady = users.filter((u) => !u.done).map((u) => u.user);
     const locked = isLocked(r, now);
@@ -349,7 +363,8 @@ export function createLogic(db, { admins = [] } = {}) {
       restaurant: { name: r.rname, url: r.rurl, phone: r.rphone },
       creator: r.creator,
       buyer: r.buyer,
-      paypal: r.paypal,
+      paypal: canSeePay ? r.paypal : '',
+      paypal_visible: canSeePay,
       delivery_fee_cents: r.delivery_fee_cents,
       created_at: r.created_at,
       expires_at: r.expires_at,
@@ -485,6 +500,7 @@ export function createLogic(db, { admins = [] } = {}) {
     restaurants: () => q.restAll.all(),
     createRound,
     updateRound,
+    myPaypal: (user) => (user ? (q.profGet.get(lower(user))?.paypal ?? '') : ''),
     changeTime,
     addItem,
     updateItem,

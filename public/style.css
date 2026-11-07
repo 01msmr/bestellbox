@@ -145,3 +145,18 @@ details > summary { cursor: pointer; font-weight: 600; }
 .pill.price { border-color: var(--accent); color: var(--accent); }
 .warn-text { color: var(--bad-text); font-size: 14px; font-weight: 600; }
 .notice { padding: 9px 12px; border: 1px solid var(--line); border-left: 6px solid var(--warn); border-radius: var(--radius); background: var(--surface); font-size: 14px; }
+
+/* Rundenseite: mobil einspaltig; Tablet breiter; Desktop zwei Spalten (links Tabs, rechts Frist/Banner/Bezahlen) */
+.round-grid, .round-side, .round-main { display: grid; gap: 16px; align-content: start; }
+.payaddr { overflow-wrap: anywhere; }
+@media (min-width: 700px) { main { max-width: 840px; } }
+@media (min-width: 1000px) {
+  main.wide { max-width: 1120px; }
+  .round-grid { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
+  .round-head { grid-column: 1 / -1; }
+  .round-main { grid-column: 1; grid-row: 2; }
+  .round-side { grid-column: 2; grid-row: 2; position: sticky; top: 68px; }
+}
+a.btn { text-decoration: none; text-align: center; }
+.pay { display: grid; gap: 10px; }
+.pay h3 { margin: 0; }

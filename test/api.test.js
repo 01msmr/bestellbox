@@ -152,3 +152,30 @@ test('Katalog, Varianten, Preishinweis', async () => {
     await close();
   }
 });
+
+test('Gemerkte Lieferkosten/PayPal, PayPal geschützt', async () => {
+  const { call, close } = await boot();
+  try {
+    const r1 = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Roma' }, paypal: 'paypal.me/uli', delivery_fee: '2,50' })).body.id;
+    await call('POST', `/api/rounds/${r1}/items`, 'anna', { article: 'Cola', price: 2, qty: 1 });
+
+    // Sichtbarkeit: Teilnehmer/Besteller ja, Fremde und anonym nein, nie in Listen
+    assert.equal((await call('GET', `/api/rounds/${r1}`, 'anna')).body.paypal, 'paypal.me/uli');
+    assert.equal((await call('GET', `/api/rounds/${r1}`, 'uli')).body.paypal, 'paypal.me/uli');
+    const stranger = (await call('GET', `/api/rounds/${r1}`, 'eve')).body;
+    assert.equal(stranger.paypal, '');
+    assert.equal(stranger.paypal_visible, false);
+    assert.equal((await call('GET', `/api/rounds/${r1}`)).body.paypal, '');
+    assert.ok(!JSON.stringify((await call('GET', '/api/rounds', 'eve')).body).includes('paypal.me'));
+    assert.ok(!JSON.stringify((await call('GET', '/api/restaurants', 'eve')).body).includes('paypal.me'));
+    assert.equal((await call('GET', '/api/me/paypal', 'eve')).body.paypal, '');
+
+    // Gemerkt: Adresse je Besteller, Lieferkosten je Restaurant
+    assert.equal((await call('GET', '/api/me/paypal', 'uli')).body.paypal, 'paypal.me/uli');
+    assert.equal((await call('GET', '/api/restaurants', 'x')).body[0].last_delivery_fee_cents, 250);
+    const r2 = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Roma' } })).body.id;
+    assert.equal((await call('GET', `/api/rounds/${r2}`, 'uli')).body.paypal, 'paypal.me/uli', 'Adresse wird übernommen');
+  } finally {
+    await close();
+  }
+});
