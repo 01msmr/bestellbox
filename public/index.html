@@ -10,9 +10,11 @@
 </head>
 <body>
   <header class="top">
-    <button id="menu" class="chip menu-btn" type="button" data-i18n-title="Bestellungen">☰</button>
     <a class="brand" href="#/">bestellbox</a>
-    <span class="spacer"></span>
+    <nav>
+      <a href="#/" data-nav="orders" data-i18n="Bestellungen">Bestellungen</a>
+      <a href="#/stats" data-nav="stats" data-i18n="Statistik">Statistik</a>
+    </nav>
     <button id="who" class="chip" type="button" data-i18n-title="Username ändern"></button>
     <details id="look" class="look">
       <summary class="chip" data-i18n-title="Darstellung"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="display:block"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></summary>
@@ -48,7 +50,6 @@
     <aside id="side"></aside>
     <main id="app"></main>
   </div>
-  <div id="scrim" class="hidden"></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script type="module" src="/i18n.js"></script>
   <script type="module" src="/app.js"></script>

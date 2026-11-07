@@ -115,7 +115,6 @@ const EN = {
   'Offen': 'Open',
   'Unbezahlt': 'Unpaid',
   'Abgeschlossen': 'Finished',
-  '📊 Statistik': '📊 Statistics',
   'Letzte 30 Bestellungen': 'Last 30 orders',
   'Alle': 'All',
   'Noch keine Daten.': 'No data yet.',

@@ -46,7 +46,10 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .top { position: sticky; top: 0; z-index: 5; display: flex; gap: 14px; align-items: center; padding: 10px 14px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .top a { color: var(--fg); text-decoration: none; }
 .brand { font-weight: 700; letter-spacing: -.2px; }
-.top .spacer { flex: 1; }
+.top nav { display: flex; gap: 14px; flex: 1; font-size: 14px; }
+.top nav a { color: var(--muted); }
+.top nav a:hover, .top nav a.active { color: var(--fg); }
+.top nav a.active { font-weight: 600; }
 .chip { border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 14px; cursor: pointer; }
 .chip:hover { background: var(--surface); }
 
@@ -160,21 +163,17 @@ a.btn { text-decoration: none; text-align: center; }
 .pay { display: grid; gap: 10px; }
 .pay h3 { margin: 0; }
 
-/* Sidebar mit Bestellungen. Unter 1000 px als ausklappbares Menü (☰), darüber fest links. */
+/* Sidebar mit Bestellungen: ab 1000 px fest links. Darunter führt „Bestellungen“ in der Navi zur Liste auf der Startseite. */
 .layout { display: block; }
 #side { display: none; }
-body.side-open #side { display: block; position: fixed; z-index: 20; top: 53px; bottom: 0; left: 0; width: min(86vw, 320px); overflow: auto; padding: 12px; background: var(--bg); border-right: 1px solid var(--line); }
-#scrim { position: fixed; z-index: 15; inset: 53px 0 0 0; background: #0006; }
 .side-new { display: block; margin-bottom: 10px; }
 #side h4 { margin: 14px 4px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .side-item { display: block; padding: 8px 10px; border: 1px solid transparent; border-radius: var(--radius); color: var(--fg); text-decoration: none; }
 .side-item:hover { background: var(--surface); }
 .side-item.active { background: var(--surface); border-color: var(--line); font-weight: 600; }
 .side-item .sub { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 13px; font-weight: 400; color: var(--muted); }
-.side-foot { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); }
 @media (min-width: 1000px) {
   .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); }
   #side { display: block; position: sticky; top: 53px; height: calc(100vh - 53px); overflow: auto; padding: 12px; border-right: 1px solid var(--line); }
-  .menu-btn, #scrim { display: none !important; }
   .home-lists { display: none; }
 }

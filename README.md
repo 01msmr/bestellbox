@@ -21,8 +21,9 @@ alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt
 - **Bezahlen:** Block mit PayPal-Adresse des Bestellers (kopierbar) und, bei paypal.me-Adressen, einem Link mit dem
   eigenen Betrag. PayPal-Adresse (je Besteller) und Lieferkosten (je Restaurant) werden gemerkt und bei der nächsten
   Runde vorgeschlagen. Die Adresse erscheint nie in Listen, nur in der Runde für Teilnehmer, Besteller, Ersteller und Admins.
-- **Navigation:** Sidebar links mit allen Bestellungen (Offen / Unbezahlt / Abgeschlossen, live), „Neue Bestellung“ oben,
-  Statistik unten. Mobil als ausklappbares Menü (☰). Jede Bestellung hat eine eigene Seite/Adresse (`#/r/<Nr>`).
+- **Navigation:** oben „Bestellungen“ und „Statistik“. Ab ca. 1000 px zusätzlich eine Sidebar links mit allen Bestellungen
+  (Offen / Unbezahlt / Abgeschlossen, live) und „Neue Bestellung“; auf schmalen Bildschirmen steht die Liste auf der Startseite.
+  Jede Bestellung hat eine eigene Seite/Adresse (`#/r/<Nr>`).
 - **Layout:** mobil einspaltig, Tablet breiter, sehr breite Desktops zweispaltig (links Tabs, rechts Frist/Banner/Bezahlen).
 - **Offene Beträge:** eine Zeile pro User. Runden mit offenen Beträgen erscheinen separat als *unbezahlt*.
 - **Statistik** (letzte 30 / alle): meistbestelltes Restaurant, beliebtestes Gericht je Restaurant,

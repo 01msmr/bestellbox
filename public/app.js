@@ -144,13 +144,6 @@ function parseMoney(v) {
 
 // ---------- Sidebar (Bestellungen zum Springen, Statistik unten) ----------
 const sideEl = document.getElementById('side');
-const scrim = document.getElementById('scrim');
-const setSide = (open) => {
-  document.body.classList.toggle('side-open', open);
-  scrim.classList.toggle('hidden', !open);
-};
-document.getElementById('menu').addEventListener('click', () => setSide(!document.body.classList.contains('side-open')));
-scrim.addEventListener('click', () => setSide(false));
 
 let sideRounds = [];
 async function loadSide() {
@@ -184,8 +177,7 @@ function renderSide() {
     h('a', { class: 'btn side-new', href: '#/' }, t('+ Neue Bestellung')),
     ...group(t('Offen'), sideRounds.filter((r) => !r.locked)),
     ...group(t('Unbezahlt'), sideRounds.filter((r) => r.unpaid)),
-    ...group(t('Abgeschlossen'), sideRounds.filter((r) => r.locked && !r.unpaid).slice(0, 10)),
-    h('div', { class: 'side-foot' }, h('a', { class: 'side-item' + (hash === '#/stats' ? ' active' : ''), href: '#/stats' }, t('📊 Statistik')))
+    ...group(t('Abgeschlossen'), sideRounds.filter((r) => r.locked && !r.unpaid).slice(0, 10))
   );
   tickCountdowns();
 }
@@ -207,7 +199,7 @@ function route() {
   current?.destroy?.();
   current = null;
   app.classList.remove('wide');
-  setSide(false);
+  for (const a of document.querySelectorAll('.top nav a')) a.classList.toggle('active', a.dataset.nav === ((location.hash || '#/') === '#/stats' ? 'stats' : 'orders'));
   if (!me) {
     askName().then(route);
     return;
