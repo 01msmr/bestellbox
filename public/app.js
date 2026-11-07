@@ -547,7 +547,19 @@ function roundView(id) {
       b.push(h('div', { class: 'banner ok' }, t('✓ Alle fertig ({total}/{total}) – kann bestellt werden', { total: d.ready.total })));
     }
     if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('💸 Bestellung unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
+    for (const u of d.pending) {
+      b.unshift(h('div', { class: 'banner bad row between' },
+        h('span', null, t('Neu: {user} möchte mitbestellen', { user: u })),
+        h('span', { class: 'row' },
+          h('button', { class: 'btn small', onclick: () => decide({ approve: u }) }, t('Freigeben')),
+          h('button', { class: 'btn small ghost', onclick: () => decide({ reject: u }) }, t('Ablehnen')))));
+    }
+    if (d.viewer_pending) b.unshift(h('div', { class: 'banner warn' }, t('Wartet auf Freigabe durch den Besteller')));
     banners.replaceChildren(...b);
+  }
+  async function decide(body) {
+    await act(() => api('PATCH', `/rounds/${id}`, body));
+    current.refresh();
   }
 
   function itemsTable(u) {

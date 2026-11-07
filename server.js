@@ -101,12 +101,23 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
     }
     if (method === 'GET' && (m = p.match(/^\/api\/rounds\/(\d+)\/catalog$/))) return send(res, 200, logic.catalog(m[1]));
     if (method === 'POST' && (m = p.match(/^\/api\/rounds\/(\d+)\/items$/))) {
-      const id = logic.addItem(user, m[1], await readJson(req));
+      let id;
+      try {
+        id = logic.addItem(user, m[1], await readJson(req));
+      } catch (e) {
+        if (e instanceof HttpError && e.status === 403) emit(m[1]); // neue Freigabe-Anfrage live anzeigen
+        throw e;
+      }
       emit(m[1]);
       return send(res, 201, { id });
     }
     if (method === 'POST' && (m = p.match(/^\/api\/rounds\/(\d+)\/(done|paid)$/))) {
-      logic.setFlag(user, m[1], m[2], await readJson(req));
+      try {
+        logic.setFlag(user, m[1], m[2], await readJson(req));
+      } catch (e) {
+        if (e instanceof HttpError && e.status === 403) emit(m[1]);
+        throw e;
+      }
       emit(m[1]);
       return send(res, 200, logic.roundDetail(m[1], user));
     }

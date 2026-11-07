@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS participants (
   user TEXT NOT NULL,
   done INTEGER NOT NULL DEFAULT 0,
   paid INTEGER NOT NULL DEFAULT 0,
+  approved INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY (round_id, user)
 );
 CREATE TABLE IF NOT EXISTS items (
@@ -62,6 +63,8 @@ export function openDb(file = ':memory:') {
   if (!cols.includes('vkey')) db.exec("ALTER TABLE items ADD COLUMN vkey TEXT NOT NULL DEFAULT ''");
   const rcols = db.prepare('PRAGMA table_info(rounds)').all().map((c) => c.name);
   if (!rcols.includes('close_when_ready')) db.exec('ALTER TABLE rounds ADD COLUMN close_when_ready INTEGER NOT NULL DEFAULT 0');
+  const pcols = db.prepare('PRAGMA table_info(participants)').all().map((c) => c.name);
+  if (!pcols.includes('approved')) db.exec('ALTER TABLE participants ADD COLUMN approved INTEGER NOT NULL DEFAULT 1');
   return db;
 }
 
@@ -147,7 +150,12 @@ export function createLogic(db, { admins = [] } = {}) {
     roundCwr: db.prepare('UPDATE rounds SET close_when_ready = ? WHERE id = ?'),
     roundExpiry: db.prepare('UPDATE rounds SET expires_at = ? WHERE id = ?'),
     partUpsert: db.prepare('INSERT OR IGNORE INTO participants (round_id, user) VALUES (?, ?)'),
-    partAll: db.prepare('SELECT user, done, paid FROM participants WHERE round_id = ? ORDER BY rowid'),
+    partAll: db.prepare('SELECT user, done, paid FROM participants WHERE round_id = ? AND approved = 1 ORDER BY rowid'),
+    partPending: db.prepare('SELECT user FROM participants WHERE round_id = ? AND approved = 0 ORDER BY rowid'),
+    partGet: db.prepare('SELECT approved FROM participants WHERE round_id = ? AND user = ?'),
+    partAskJoin: db.prepare('INSERT OR IGNORE INTO participants (round_id, user, approved) VALUES (?, ?, 0)'),
+    partApprove: db.prepare('UPDATE participants SET approved = 1 WHERE round_id = ? AND user = ?'),
+    partDrop: db.prepare('DELETE FROM participants WHERE round_id = ? AND user = ? AND approved = 0'),
     partSetDone: db.prepare('UPDATE participants SET done = ? WHERE round_id = ? AND user = ?'),
     partSetPaid: db.prepare('UPDATE participants SET paid = ? WHERE round_id = ? AND user = ?'),
     itemAll: db.prepare('SELECT * FROM items WHERE round_id = ? ORDER BY id'),
@@ -208,6 +216,8 @@ export function createLogic(db, { admins = [] } = {}) {
     const paypal = body.paypal !== undefined ? collapse(body.paypal).slice(0, 120) : r.paypal;
     const fee = body.delivery_fee !== undefined ? parseMoneyToCents(body.delivery_fee, { max: 100 }) : r.delivery_fee_cents;
     q.roundUpdate.run(buyer, paypal, fee, r.id);
+    if (body.approve) { q.partApprove.run(r.id, cleanUser(body.approve)); autoLock(r.id); }
+    if (body.reject) q.partDrop.run(r.id, cleanUser(body.reject));
     if (body.close_when_ready !== undefined) {
       q.roundCwr.run(body.close_when_ready ? 1 : 0, r.id);
       if (body.close_when_ready) autoLock(r.id);
@@ -260,11 +270,21 @@ export function createLogic(db, { admins = [] } = {}) {
 
   const isLocked = (r, now) => now >= r.expires_at;
 
+  // Bei „Schließen, wenn alle fertig“ kommen neue User nur nach Freigabe durch Ersteller/Besteller/Admin hinein.
+  function admit(r, user) {
+    if (!r.close_when_ready || canManage(r, user)) return;
+    const p = q.partGet.get(r.id, user);
+    if (p && p.approved) return;
+    q.partAskJoin.run(r.id, user);
+    throw new HttpError(403, 'Wartet auf Freigabe durch den Besteller');
+  }
+
   function addItem(user, roundId, body) {
     user = cleanUser(user);
     const r = getRound(roundId);
     if (isLocked(r, Date.now())) throw new HttpError(423, 'Bestellung ist gesperrt');
     const it = parseItem(body);
+    admit(r, user);
     q.partUpsert.run(r.id, user);
     return Number(q.itemInsert.run(r.id, user, it.article, it.akey, it.variant, it.vkey, it.price, it.qty).lastInsertRowid);
   }
@@ -304,6 +324,7 @@ export function createLogic(db, { admins = [] } = {}) {
     const self = lower(target) === lower(user);
     if (!self && !canManage(r, user)) throw new HttpError(403, 'Nur für sich selbst (oder als Ersteller/Besteller/Admin)');
     const value = body.value ? 1 : 0;
+    if (self) admit(r, target);
     q.partUpsert.run(r.id, target);
     (flag === 'done' ? q.partSetDone : q.partSetPaid).run(value, r.id, target);
     if (flag === 'done' && value) autoLock(r.id);
@@ -388,6 +409,8 @@ export function createLogic(db, { admins = [] } = {}) {
       created_at: r.created_at,
       expires_at: r.expires_at,
       close_when_ready: !!r.close_when_ready,
+      pending: r.close_when_ready && viewer && canManage(r, viewer) ? q.partPending.all(r.id).map((x) => x.user) : [],
+      viewer_pending: !!(r.close_when_ready && viewer && !canManage(r, viewer) && q.partGet.get(r.id, viewer)?.approved === 0),
       server_now: now,
       locked,
       users,

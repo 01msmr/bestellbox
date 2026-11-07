@@ -197,3 +197,25 @@ test('Schließen, wenn alle fertig', async () => {
     assert.equal((await call('GET', `/api/rounds/${id}`, 'uli')).body.locked, true, 'alle fertig -> gesperrt');
   } finally { await close(); }
 });
+
+test('Schließen-wenn-fertig: neue User brauchen Freigabe', async () => {
+  const { call, close } = await boot();
+  try {
+    const id = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Roma' }, minutes: 20 })).body.id;
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cola', price: '2' });
+    await call('PATCH', `/api/rounds/${id}`, 'uli', { close_when_ready: true });
+    let r = await call('POST', `/api/rounds/${id}/items`, 'ben', { article: 'Pizza', price: '8' });
+    assert.equal(r.status, 403, 'ben wartet');
+    let d = (await call('GET', `/api/rounds/${id}`, 'uli')).body;
+    assert.deepEqual(d.pending, ['ben']);
+    assert.equal(d.users.some((u) => u.user === 'ben'), false);
+    assert.equal((await call('GET', `/api/rounds/${id}`, 'ben')).body.viewer_pending, true);
+    assert.deepEqual((await call('GET', `/api/rounds/${id}`, 'anna')).body.pending, [], 'nur Verwalter sehen es');
+    assert.equal((await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Wasser', price: '1' })).status, 201, 'bestehende User weiter ok');
+    await call('PATCH', `/api/rounds/${id}`, 'uli', { approve: 'ben' });
+    r = await call('POST', `/api/rounds/${id}/items`, 'ben', { article: 'Pizza', price: '8' });
+    assert.equal(r.status, 201);
+    d = (await call('GET', `/api/rounds/${id}`, 'uli')).body;
+    assert.deepEqual(d.pending, []);
+  } finally { await close(); }
+});
