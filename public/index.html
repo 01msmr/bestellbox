@@ -12,27 +12,35 @@
   <header class="top">
     <a class="brand" href="#/">bestellbox</a>
     <nav>
-      <a href="#/">Runden</a>
-      <a href="#/stats">Statistik</a>
+      <a href="#/" data-i18n="Runden">Runden</a>
+      <a href="#/stats" data-i18n="Statistik">Statistik</a>
     </nav>
-    <button id="who" class="chip" type="button" title="Username ändern"></button>
+    <button id="who" class="chip" type="button" data-i18n-title="Username ändern"></button>
     <details id="look" class="look">
-      <summary class="chip" title="Darstellung" aria-label="Darstellung"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="display:block"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></summary>
+      <summary class="chip" data-i18n-title="Darstellung"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="display:block"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></summary>
       <div class="look-panel">
         <div>
-          <h4>Modus</h4>
+          <h4 data-i18n="Modus">Modus</h4>
           <div class="seg">
             <button type="button" data-mode="auto">Auto</button>
-            <button type="button" data-mode="light">Hell</button>
-            <button type="button" data-mode="dark">Dunkel</button>
+            <button type="button" data-mode="light" data-i18n="Hell">Hell</button>
+            <button type="button" data-mode="dark" data-i18n="Dunkel">Dunkel</button>
           </div>
         </div>
         <div>
-          <h4>Farbe</h4>
+          <h4 data-i18n="Sprache">Sprache</h4>
+          <div class="seg">
+            <button type="button" data-lang="auto">Auto</button>
+            <button type="button" data-lang="de">DE</button>
+            <button type="button" data-lang="en">EN</button>
+          </div>
+        </div>
+        <div>
+          <h4 data-i18n="Farbe">Farbe</h4>
           <div class="swatches">
-            <button type="button" class="swatch" data-theme="mono"><i></i>S/W</button>
+            <button type="button" class="swatch" data-theme="mono"><i></i><span data-i18n="S/W">S/W</span></button>
             <button type="button" class="swatch" data-theme="ozean"><i></i>Ozean</button>
-            <button type="button" class="swatch" data-theme="beere"><i></i>Beere</button>
+            <button type="button" class="swatch" data-theme="beere"><i></i><span data-i18n="Beere">Beere</span></button>
           </div>
         </div>
       </div>
@@ -40,6 +48,7 @@
   </header>
   <main id="app"></main>
   <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/i18n.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

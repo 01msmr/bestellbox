@@ -93,7 +93,8 @@ test('Unbezahlte Runde und Statistik', async () => {
     assert.equal(st.restaurants[0].name, 'Burger Hub');
     assert.equal(st.restaurants[0].top_dish, 'Cheeseburger');
     assert.equal(st.avg_item_cents, 900);
-    assert.equal(st.users.find((u) => u.user === 'anna').avg_order_cents, 1800);
+    assert.equal(st.avg_order_cents, 1350);
+    assert.equal(st.users, undefined, 'keine Statistik nach User');
   } finally {
     await close();
   }

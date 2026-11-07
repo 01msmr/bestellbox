@@ -430,7 +430,7 @@ export function createLogic(db, { admins = [] } = {}) {
   function stats(scope = 'all') {
     const limitSql = scope === 'last30' ? 'ORDER BY created_at DESC, id DESC LIMIT 30' : '';
     const ids = db.prepare(`SELECT id FROM rounds ${limitSql}`).all().map((r) => r.id);
-    if (!ids.length) return { scope, rounds: 0, restaurants: [], users: [], avg_item_cents: 0, avg_order_cents: 0 };
+    if (!ids.length) return { scope, rounds: 0, restaurants: [], avg_item_cents: 0, avg_order_cents: 0 };
     const ph = ids.map(() => '?').join(',');
     const rows = db
       .prepare(
@@ -449,7 +449,6 @@ export function createLogic(db, { admins = [] } = {}) {
       e.rounds += 1;
       rest.set(name, e);
     }
-    const users = new Map();
     let units = 0;
     let money = 0;
     const orders = new Map(); // round|user -> cents
@@ -462,11 +461,6 @@ export function createLogic(db, { admins = [] } = {}) {
       units += it.qty;
       money += it.price_cents * it.qty;
       const uk = lower(it.user);
-      const u = users.get(uk) ?? { user: it.user, units: 0, money: 0, orders: new Set() };
-      u.units += it.qty;
-      u.money += it.price_cents * it.qty;
-      u.orders.add(it.round_id);
-      users.set(uk, u);
       const ok = `${it.round_id}|${uk}`;
       orders.set(ok, (orders.get(ok) ?? 0) + it.price_cents * it.qty);
     }
@@ -481,15 +475,7 @@ export function createLogic(db, { admins = [] } = {}) {
           const top = [...e.dishes.values()].sort((a, b) => b.qty - a.qty || a.article.localeCompare(b.article, 'de'))[0];
           return { name: e.name, rounds: e.rounds, items: e.items, top_dish: top ? top.article : null, top_dish_qty: top ? top.qty : 0 };
         })
-        .sort((a, b) => b.rounds - a.rounds || b.items - a.items),
-      users: [...users.values()]
-        .map((u) => ({
-          user: u.user,
-          orders: u.orders.size,
-          avg_item_cents: Math.round(u.money / u.units),
-          avg_order_cents: Math.round(u.money / u.orders.size),
-        }))
-        .sort((a, b) => b.orders - a.orders || a.user.localeCompare(b.user, 'de')),
+        .sort((a, b) => b.rounds - a.rounds || b.items - a.items)
     };
   }
 

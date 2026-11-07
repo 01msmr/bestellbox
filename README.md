@@ -20,8 +20,10 @@ alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt
 - **Bestellt von** + PayPal-Adresse/Link und **Lieferkosten** (anteilig nach Artikelsumme verteilt).
 - **Offene Beträge:** eine Zeile pro User. Runden mit offenen Beträgen erscheinen separat als *unbezahlt*.
 - **Statistik** (letzte 30 / alle): meistbestelltes Restaurant, beliebtestes Gericht je Restaurant,
-  Ø Artikelpreis und Ø Bestellsumme pro User.
+  Ø Artikelpreis und Ø Bestellsumme. Es gibt bewusst keine Auswertung nach einzelnen Usern.
 - **Darstellung:** Hell/Dunkel automatisch nach System, manuell überschreibbar; Themen S/W, Ozean, Beere.
+- **Sprache:** Deutsch/Englisch, automatisch nach Browsersprache, manuell umschaltbar (◐-Panel).
+  Neue Texte: deutscher Text ist der Schlüssel, Englisch steht in `public/i18n.js`.
 
 ## Start
 

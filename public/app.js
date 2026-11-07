@@ -1,12 +1,14 @@
 // bestellbox – Frontend (Vanilla JS, keine Build-Schritte)
 
+import { t, locale } from '/i18n.js';
+
 const app = document.getElementById('app');
 const whoBtn = document.getElementById('who');
 const toastEl = document.getElementById('toast');
 
-const eurFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+const eurFmt = new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' });
 const eur = (c) => eurFmt.format((c ?? 0) / 100);
-const fmtDate = (ms) => new Date(ms).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+const fmtDate = (ms) => new Date(ms).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
 const lc = (s) => String(s ?? '').toLocaleLowerCase('de');
 
 function h(tag, props, ...kids) {
@@ -44,7 +46,7 @@ async function api(method, path, body) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) throw new Error(t(data.error || res.statusText));
   return data;
 }
 
@@ -61,12 +63,12 @@ async function act(fn) {
 function setMe(name) {
   me = name.trim().slice(0, 32);
   localStorage.setItem('bb_user', me);
-  whoBtn.textContent = me ? `👤 ${me}` : 'Name wählen';
+  whoBtn.textContent = me ? `👤 ${me}` : t('Name wählen');
 }
 
 function askName() {
   return new Promise((resolve) => {
-    const input = h('input', { placeholder: 'Dein Name', maxlength: 32, autofocus: true, value: me });
+    const input = h('input', { placeholder: t('Dein Name'), maxlength: 32, autofocus: true, value: me });
     const form = h(
       'form',
       {
@@ -78,9 +80,9 @@ function askName() {
           resolve();
         },
       },
-      h('h2', null, 'Wie heißt du?'),
-      h('p', { class: 'muted' }, 'Der Name erscheint bei deinen Positionen. Gleicher Name = gleiche Person, bitte konsistent verwenden.'),
-      h('div', { class: 'row' }, h('div', { class: 'grow' }, input), h('button', { class: 'btn', type: 'submit' }, 'Los'))
+      h('h2', null, t('Wie heißt du?')),
+      h('p', { class: 'muted' }, t('Der Name erscheint bei deinen Positionen. Gleicher Name = gleiche Person, bitte konsistent verwenden.')),
+      h('div', { class: 'row' }, h('div', { class: 'grow' }, input), h('button', { class: 'btn', type: 'submit' }, t('Los')))
     );
     app.replaceChildren(form);
     input.focus();
@@ -113,7 +115,7 @@ function contactLinks(r) {
   return h(
     'div',
     { class: 'row' },
-    tel ? h('a', { href: tel }, '📞 ' + r.phone) : h('span', { class: 'muted' }, 'keine Telefonnummer'),
+    tel ? h('a', { href: tel }, '📞 ' + r.phone) : h('span', { class: 'muted' }, t('keine Telefonnummer')),
     web ? h('a', { href: web, target: '_blank', rel: 'noopener noreferrer' }, '🌐 ' + r.url.replace(/^https?:\/\//i, '')) : null
   );
 }
@@ -173,11 +175,11 @@ function homeView() {
   let restaurants = [];
   const datalist = h('datalist', { id: 'rest-list' });
   const f = {
-    name: h('input', { list: 'rest-list', placeholder: 'z. B. Pizza Roma', required: true, maxlength: 80, autocomplete: 'off' }),
+    name: h('input', { list: 'rest-list', placeholder: t('z. B. Pizza Roma'), required: true, maxlength: 80, autocomplete: 'off' }),
     url: h('input', { placeholder: 'https://…', maxlength: 300 }),
     phone: h('input', { type: 'tel', placeholder: '07531 …', maxlength: 40 }),
     buyer: h('input', { value: me, maxlength: 32, required: true }),
-    paypal: h('input', { value: localStorage.getItem('bb_paypal') ?? '', placeholder: 'paypal.me/name oder E-Mail', maxlength: 120 }),
+    paypal: h('input', { value: localStorage.getItem('bb_paypal') ?? '', placeholder: t('paypal.me/name oder E-Mail'), maxlength: 120 }),
     fee: h('input', { inputmode: 'decimal', placeholder: '0,00' }),
     minutes: h('input', { type: 'number', min: 1, max: 240, value: 20 }),
   };
@@ -212,30 +214,30 @@ function homeView() {
       class: 'grid2',
     },
     h('label', null, 'Restaurant', f.name, datalist),
-    h('label', null, 'Telefon', f.phone),
-    h('label', null, 'Webadresse', f.url),
-    h('label', null, 'Lieferkosten (€)', f.fee),
-    h('label', null, 'Bestellt von', f.buyer),
-    h('label', null, 'PayPal (Adresse/Link)', f.paypal),
-    h('label', null, 'Frist (Minuten)', f.minutes),
-    h('div', { class: 'row', style: 'align-items:end' }, h('button', { class: 'btn', type: 'submit' }, 'Runde starten'))
+    h('label', null, t('Telefon'), f.phone),
+    h('label', null, t('Webadresse'), f.url),
+    h('label', null, t('Lieferkosten (€)'), f.fee),
+    h('label', null, t('Bestellt von'), f.buyer),
+    h('label', null, t('PayPal (Adresse/Link)'), f.paypal),
+    h('label', null, t('Frist (Minuten)'), f.minutes),
+    h('div', { class: 'row', style: 'align-items:end' }, h('button', { class: 'btn', type: 'submit' }, t('Runde starten')))
   );
 
   const activeBox = h('div', { class: 'list' });
   const unpaidBox = h('div', { class: 'list' });
   const recentBox = h('div', { class: 'list' });
-  const unpaidCard = h('section', { class: 'card hidden' }, h('h2', null, '💸 Unbezahlte Runden'), unpaidBox);
+  const unpaidCard = h('section', { class: 'card hidden' }, h('h2', null, t('💸 Unbezahlte Runden')), unpaidBox);
 
   app.replaceChildren(
-    h('section', { class: 'card' }, h('details', { open: true }, h('summary', null, 'Neue Runde'), h('div', { style: 'margin-top:10px' }, form))),
-    h('section', { class: 'card' }, h('h2', null, 'Laufende Runden'), activeBox),
+    h('section', { class: 'card' }, h('details', { open: true }, h('summary', null, t('Neue Runde')), h('div', { style: 'margin-top:10px' }, form))),
+    h('section', { class: 'card' }, h('h2', null, t('Laufende Runden')), activeBox),
     unpaidCard,
-    h('section', { class: 'card' }, h('h2', null, 'Letzte Runden'), recentBox)
+    h('section', { class: 'card' }, h('h2', null, t('Letzte Runden')), recentBox)
   );
 
   const roundItem = (r) => {
     const status = r.locked
-      ? h('span', { class: 'badge mid' }, 'gesperrt')
+      ? h('span', { class: 'badge mid' }, t('gesperrt'))
       : h('span', { class: 'badge on', 'data-expires': r.expires_at }, '…');
     return h(
       'a',
@@ -244,12 +246,12 @@ function homeView() {
         'div',
         { class: 'card', style: 'padding:10px' },
         h('div', { class: 'row between' }, h('strong', null, r.restaurant), status),
-        h('div', { class: 'muted' }, `${fmtDate(r.created_at)} · ${r.creator} · bestellt von ${r.buyer}`),
+        h('div', { class: 'muted' }, `${fmtDate(r.created_at)} · ${r.creator} · ${t('bestellt von')} ${r.buyer}`),
         h(
           'div',
           { class: 'row between' },
-          h('span', null, `${r.done}/${r.users} fertig · ${eur(r.total_cents)}`),
-          r.unpaid ? h('span', { class: 'badge off' }, `unbezahlt: ${eur(r.debts_total_cents)}`) : null
+          h('span', null, `${r.done}/${r.users} ${t('fertig')} · ${eur(r.total_cents)}`),
+          r.unpaid ? h('span', { class: 'badge off' }, `${t('unbezahlt')}: ${eur(r.debts_total_cents)}`) : null
         )
       )
     );
@@ -261,7 +263,7 @@ function homeView() {
   const tick = setInterval(() => {
     for (const el of app.querySelectorAll('[data-expires]')) {
       const left = Number(el.dataset.expires) - (Date.now() + skew);
-      el.textContent = left > 0 ? `noch ${fmtRemaining(left)}` : 'abgelaufen';
+      el.textContent = left > 0 ? `${t('noch')} ${fmtRemaining(left)}` : t('abgelaufen');
       el.className = 'badge ' + (left > 0 ? (left < 120000 ? 'off' : 'on') : 'mid');
     }
   }, 1000);
@@ -277,10 +279,10 @@ function homeView() {
       const active = rounds.filter((r) => !r.locked);
       const unpaid = rounds.filter((r) => r.unpaid);
       const recent = rounds.filter((r) => r.locked && !r.unpaid).slice(0, 10);
-      fill(activeBox, active, 'Keine laufende Runde.');
+      fill(activeBox, active, t('Keine laufende Runde.'));
       fill(unpaidBox, unpaid, '');
       unpaidCard.classList.toggle('hidden', unpaid.length === 0);
-      fill(recentBox, recent, 'Noch nichts abgeschlossen.');
+      fill(recentBox, recent, t('Noch nichts abgeschlossen.'));
     },
     destroy() {
       clearInterval(tick);
@@ -309,11 +311,11 @@ function roundView(id) {
   const debtsCard = h('section', { class: 'card' });
 
   // Persistente Eingabezeile (wird bei Live-Updates nicht neu gebaut)
-  const inArticle = h('input', { placeholder: 'Artikel', maxlength: 80, required: true, autocomplete: 'off' });
-  const inVariant = h('input', { placeholder: 'z. B. 26 cm, Fladenbrot, scharf', maxlength: 80, autocomplete: 'off' });
-  const inPrice = h('input', { placeholder: 'Preis €', inputmode: 'decimal', required: true });
+  const inArticle = h('input', { placeholder: t('Artikel'), maxlength: 80, required: true, autocomplete: 'off' });
+  const inVariant = h('input', { placeholder: t('z. B. 26 cm, Fladenbrot, scharf'), maxlength: 80, autocomplete: 'off' });
+  const inPrice = h('input', { placeholder: t('Preis €'), inputmode: 'decimal', required: true });
   const inQty = h('input', { type: 'number', min: 1, max: 99, value: 1 });
-  const addBtn = h('button', { class: 'btn', type: 'submit' }, 'Hinzufügen');
+  const addBtn = h('button', { class: 'btn', type: 'submit' }, t('Hinzufügen'));
   const sugBox = h('div', { class: 'assist' });
   let catalog = []; // gelernte Namen dieses Restaurants (nur Vorschläge, nichts wird automatisch gesetzt)
 
@@ -340,7 +342,7 @@ function roundView(id) {
       const kv = knownVariant(e);
       // Preis wird NIE vorausgefüllt – nur als Hinweis angeboten, damit er bewusst geprüft wird.
       if (kv?.last_price_cents != null) {
-        parts.push(h('button', { type: 'button', class: 'pill price', onclick: () => { inPrice.value = (kv.last_price_cents / 100).toFixed(2).replace('.', ','); inPrice.focus(); } }, `zuletzt ${eur(kv.last_price_cents)} (ungeprüft) – übernehmen`));
+        parts.push(h('button', { type: 'button', class: 'pill price', onclick: () => { inPrice.value = (kv.last_price_cents / 100).toFixed(2).replace('.', ','); inPrice.focus(); } }, t('zuletzt {p} (ungeprüft) – übernehmen', { p: eur(kv.last_price_cents) })));
       }
     }
     sugBox.replaceChildren(...parts);
@@ -358,7 +360,7 @@ function roundView(id) {
         const kv = knownVariant(knownEntry());
         const ok = await act(() => api('POST', `/rounds/${id}/items`, { article: inArticle.value, variant: inVariant.value, price, qty: Number(inQty.value) || 1 }));
         if (ok) {
-          if (kv?.last_price_cents != null && Math.round(price * 100) !== kv.last_price_cents) toast(`Preis weicht ab – zuletzt ${eur(kv.last_price_cents)}`);
+          if (kv?.last_price_cents != null && Math.round(price * 100) !== kv.last_price_cents) toast(t('Preis weicht ab – zuletzt {p}', { p: eur(kv.last_price_cents) }));
           inArticle.value = '';
           inVariant.value = '';
           inPrice.value = '';
@@ -370,13 +372,13 @@ function roundView(id) {
         }
       },
     },
-    h('h3', null, 'Artikel eintragen'),
+    h('h3', null, t('Artikel eintragen')),
     h('div', { style: 'display:grid;gap:10px' },
-      h('label', null, 'Artikel', inArticle),
-      h('label', null, 'Variante (optional)', inVariant),
+      h('label', null, t('Artikel'), inArticle),
+      h('label', null, t('Variante (optional)'), inVariant),
       sugBox,
-      h('div', { class: 'grid2', style: 'grid-template-columns:2fr 1fr' }, h('label', null, 'Preis', inPrice), h('label', null, 'Menge', inQty)),
-      h('div', { class: 'notice' }, h('strong', null, '⚠ Preis selbst prüfen. '), 'Du bist für deine Angaben verantwortlich. Vorgeschlagene Preise stammen aus früheren Bestellungen und können veraltet oder falsch sein.')
+      h('div', { class: 'grid2', style: 'grid-template-columns:2fr 1fr' }, h('label', null, t('Preis'), inPrice), h('label', null, t('Menge'), inQty)),
+      h('div', { class: 'notice' }, h('strong', null, t('⚠ Preis selbst prüfen. ')), t('Du bist für deine Angaben verantwortlich. Vorgeschlagene Preise stammen aus früheren Bestellungen und können veraltet oder falsch sein.'))
     ),
     h('div', { style: 'margin-top:10px' }, addBtn)
   );
@@ -385,9 +387,9 @@ function roundView(id) {
 
   const panes = { users: usersPane, mine: minePane, order: orderPane };
   const tabDefs = [
-    ['users', 'Nach Usern'],
-    ['mine', 'Meine'],
-    ['order', 'Bestellen'],
+    ['users', t('Nach Usern')],
+    ['mine', t('Meine')],
+    ['order', t('Bestellen')],
   ];
   function showTab(t) {
     tab = t;
@@ -407,11 +409,11 @@ function roundView(id) {
 
   function flagBadge(u, flag) {
     const on = u[flag];
-    const label = flag === 'done' ? (on ? '✓ fertig' : 'in Arbeit') : on ? '✓ bezahlt' : 'nicht bezahlt';
+    const label = flag === 'done' ? (on ? t('✓ fertig') : t('in Arbeit')) : on ? t('✓ bezahlt') : t('nicht bezahlt');
     const cls = on ? 'on' : flag === 'done' ? 'mid' : 'off';
     const editable = lc(u.user) === lc(me) || d.viewer.can_manage;
     if (!editable) return h('span', { class: `badge ${cls}` }, label);
-    return h('button', { class: `badge ${cls}`, title: 'Umschalten', onclick: () => toggle(flag, { user: u.user, value: !on }) }, label);
+    return h('button', { class: `badge ${cls}`, title: t('Umschalten'), onclick: () => toggle(flag, { user: u.user, value: !on }) }, label);
   }
 
   function renderHead() {
@@ -422,22 +424,22 @@ function roundView(id) {
     const editFee = h('input', { value: (d.delivery_fee_cents / 100).toFixed(2).replace('.', ','), inputmode: 'decimal' });
     head.replaceChildren(
       ...[
-      h('div', { class: 'row between' }, h('h2', { style: 'margin:0' }, d.restaurant.name), h('a', { href: '#/' }, '← Alle Runden')),
+      h('div', { class: 'row between' }, h('h2', { style: 'margin:0' }, d.restaurant.name), h('a', { href: '#/' }, t('← Alle Runden'))),
       contactLinks(d.restaurant),
       h(
         'div',
         { class: 'muted', style: 'margin-top:6px' },
-        `Gestartet ${fmtDate(d.created_at)} von ${d.creator} · bestellt von `,
+        t('Gestartet {date} von {creator} · bestellt von ', { date: fmtDate(d.created_at), creator: d.creator }),
         h('strong', null, d.buyer),
         ' · PayPal: ',
         pp ? (ppLink ? h('a', { href: ppLink, target: '_blank', rel: 'noopener noreferrer' }, pp) : pp) : '—',
-        ` · Lieferkosten: ${eur(d.delivery_fee_cents)}`
+        t(' · Lieferkosten: {fee}', { fee: eur(d.delivery_fee_cents) })
       ),
       d.viewer.can_manage
         ? h(
             'details',
             { style: 'margin-top:8px' },
-            h('summary', null, 'Runde bearbeiten'),
+            h('summary', null, t('Runde bearbeiten')),
             h(
               'form',
               {
@@ -449,10 +451,10 @@ function roundView(id) {
                   current.refresh();
                 },
               },
-              h('label', null, 'Bestellt von', editBuyer),
+              h('label', null, t('Bestellt von'), editBuyer),
               h('label', null, 'PayPal', editPaypal),
-              h('label', null, 'Lieferkosten (€)', editFee),
-              h('div', { class: 'row', style: 'align-items:end' }, h('button', { class: 'btn small', type: 'submit' }, 'Speichern'))
+              h('label', null, t('Lieferkosten (€)'), editFee),
+              h('div', { class: 'row', style: 'align-items:end' }, h('button', { class: 'btn small', type: 'submit' }, t('Speichern')))
             )
           )
         : null
@@ -461,12 +463,12 @@ function roundView(id) {
   }
 
   function renderTimerControls() {
-    timerLabel.textContent = d.locked ? 'Bestellfrist abgelaufen – Runde gesperrt' : 'Bestellfrist';
+    timerLabel.textContent = d.locked ? t('Bestellfrist abgelaufen – Runde gesperrt') : t('Bestellfrist');
     const buttons = [];
     if (d.viewer.can_manage) {
       buttons.push(h('button', { class: 'btn small', onclick: () => timeAction('extend', 5) }, '+5 min'));
-      if (!d.locked) buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('lock') }, 'Jetzt sperren'));
-      else buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('extend', 5) }, 'Wieder öffnen'));
+      if (!d.locked) buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('lock') }, t('Jetzt sperren')));
+      else buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('extend', 5) }, t('Wieder öffnen')));
     }
     timerBtns.replaceChildren(...buttons);
   }
@@ -479,13 +481,13 @@ function roundView(id) {
   function renderBanners() {
     const b = [];
     if (d.ready.total === 0) {
-      b.push(h('div', { class: 'banner warn' }, 'Noch keine Bestellungen – trag deine ein.'));
+      b.push(h('div', { class: 'banner warn' }, t('Noch keine Bestellungen – trag deine ein.')));
     } else if (d.ready.not_ready.length) {
-      b.push(h('div', { class: 'banner warn' }, `⚠ Noch nicht alle fertig (${d.ready.done}/${d.ready.total}): ${d.ready.not_ready.join(', ')}`));
+      b.push(h('div', { class: 'banner warn' }, t('⚠ Noch nicht alle fertig ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
     } else {
-      b.push(h('div', { class: 'banner ok' }, `✓ Alle fertig (${d.ready.total}/${d.ready.total}) – kann bestellt werden`));
+      b.push(h('div', { class: 'banner ok' }, t('✓ Alle fertig ({total}/{total}) – kann bestellt werden', { total: d.ready.total })));
     }
-    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, `💸 Runde unbezahlt: ${eur(d.debts_total_cents)} offen (${d.debts.map((x) => x.user).join(', ')})`));
+    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('💸 Runde unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
     banners.replaceChildren(...b);
   }
 
@@ -503,7 +505,7 @@ function roundView(id) {
 
   function renderUsers() {
     if (!d.users.length) {
-      usersPane.replaceChildren(h('div', { class: 'card muted' }, 'Noch niemand dabei.'));
+      usersPane.replaceChildren(h('div', { class: 'card muted' }, t('Noch niemand dabei.')));
       return;
     }
     usersPane.replaceChildren(
@@ -511,12 +513,12 @@ function roundView(id) {
         h(
           'section',
           { class: `card user-card ${u.paid || lc(u.user) === lc(d.buyer) ? 'paid' : 'unpaid'}` },
-          h('div', { class: 'row between' }, h('strong', null, u.user + (lc(u.user) === lc(d.buyer) ? ' (Besteller)' : '')), h('div', { class: 'row' }, flagBadge(u, 'done'), lc(u.user) === lc(d.buyer) ? null : flagBadge(u, 'paid'))),
-          u.items.length ? itemsTable(u) : h('div', { class: 'muted' }, 'noch nichts'),
+          h('div', { class: 'row between' }, h('strong', null, u.user + (lc(u.user) === lc(d.buyer) ? t(' (Besteller)') : '')), h('div', { class: 'row' }, flagBadge(u, 'done'), lc(u.user) === lc(d.buyer) ? null : flagBadge(u, 'paid'))),
+          u.items.length ? itemsTable(u) : h('div', { class: 'muted' }, t('noch nichts')),
           h(
             'div',
             { class: 'row between muted', style: 'margin-top:6px' },
-            h('span', null, `Artikel ${eur(u.subtotal_cents)}${u.fee_cents ? ` + Lieferanteil ${eur(u.fee_cents)}` : ''}`),
+            h('span', null, `${t('Artikel')} ${eur(u.subtotal_cents)}${u.fee_cents ? ` + ${t('Lieferanteil')} ${eur(u.fee_cents)}` : ''}`),
             h('strong', { style: 'color:var(--fg)' }, eur(u.total_cents))
           )
         )
@@ -529,7 +531,7 @@ function roundView(id) {
     for (const el of [inArticle, inVariant, inPrice, inQty, addBtn]) el.disabled = locked;
     const mineU = d.users.find((u) => lc(u.user) === lc(me));
     if (!mineU) {
-      mineList.replaceChildren(h('h3', null, 'Meine Bestellung'), h('div', { class: 'muted' }, locked ? 'Runde ist gesperrt.' : 'Noch nichts eingetragen.'));
+      mineList.replaceChildren(h('h3', null, t('Meine Bestellung')), h('div', { class: 'muted' }, locked ? t('Runde ist gesperrt.') : t('Noch nichts eingetragen.')));
       return;
     }
     const stepper = (i, delta) =>
@@ -546,7 +548,7 @@ function roundView(id) {
         delta > 0 ? '+' : '−'
       );
     mineList.replaceChildren(
-      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, 'Meine Bestellung'), h('div', { class: 'row' }, flagBadge(mineU, 'done'), lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
+      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Meine Bestellung')), h('div', { class: 'row' }, flagBadge(mineU, 'done'), lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
       mineU.items.length
         ? h(
             'table',
@@ -569,7 +571,7 @@ function roundView(id) {
                       {
                         class: 'btn small danger',
                         disabled: locked,
-                        title: 'Entfernen',
+                        title: t('Entfernen'),
                         onclick: async () => {
                           await act(() => api('DELETE', `/items/${i.id}`));
                           current.refresh();
@@ -582,33 +584,33 @@ function roundView(id) {
               )
             )
           )
-        : h('div', { class: 'muted' }, 'Noch nichts eingetragen.'),
+        : h('div', { class: 'muted' }, t('Noch nichts eingetragen.')),
       h(
         'div',
         { class: 'row between', style: 'margin-top:8px' },
-        h('span', { class: 'muted' }, `Artikel ${eur(mineU.subtotal_cents)}${mineU.fee_cents ? ` + Lieferanteil ${eur(mineU.fee_cents)}` : ''}`),
-        h('strong', null, `Summe ${eur(mineU.total_cents)}`)
+        h('span', { class: 'muted' }, `${t('Artikel')} ${eur(mineU.subtotal_cents)}${mineU.fee_cents ? ` + ${t('Lieferanteil')} ${eur(mineU.fee_cents)}` : ''}`),
+        h('strong', null, `${t('Summe')} ${eur(mineU.total_cents)}`)
       ),
-      h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted' }, 'Fertig = deine Bestellung ist komplett. Bezahlt = du hast dem Besteller dein Geld gegeben.'))
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted' }, t('Fertig = deine Bestellung ist komplett. Bezahlt = du hast dem Besteller dein Geld gegeben.')))
     );
   }
 
   function orderText() {
-    const lines = [`Bestellung ${d.restaurant.name}`];
+    const lines = [`${t('Bestellung')} ${d.restaurant.name}`];
     for (const g of d.groups) lines.push(`${g.qty}× ${g.article}${g.variant ? ` – ${g.variant}` : ''} (${eur(g.price_cents)})`);
-    lines.push('', `Summe Artikel: ${eur(d.items_total_cents)}`);
+    lines.push('', `${t('Summe Artikel')}: ${eur(d.items_total_cents)}`);
     return lines.join('\n');
   }
 
   function renderOrder() {
     const tel = telHref(d.restaurant.phone);
     orderPane.replaceChildren(
-      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, 'Sammelbestellung'), contactLinks(d.restaurant)),
+      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Sammelbestellung')), contactLinks(d.restaurant)),
       d.groups.length
         ? h(
             'table',
             { style: 'margin-top:8px' },
-            h('thead', null, h('tr', null, h('th', { class: 'num' }, 'Menge'), h('th', null, 'Artikel'), h('th', { class: 'num' }, 'Einzel'), h('th', { class: 'num' }, 'Summe'))),
+            h('thead', null, h('tr', null, h('th', { class: 'num' }, t('Menge')), h('th', null, t('Artikel')), h('th', { class: 'num' }, t('Einzel')), h('th', { class: 'num' }, t('Summe')))),
             h(
               'tbody',
               null,
@@ -617,7 +619,7 @@ function roundView(id) {
                   'tr',
                   null,
                   h('td', { class: 'num' }, `${g.qty}×`),
-                  h('td', null, g.article, g.variant ? ` · ${g.variant}` : '', h('div', { class: 'muted' }, g.users.map((x) => (x.qty > 1 ? `${x.user} ${x.qty}×` : x.user)).join(', ')), g.price_differs ? h('div', { class: 'warn-text' }, `⚠ Preis prüfen – zuletzt ${eur(g.known_price_cents)}`) : null),
+                  h('td', null, g.article, g.variant ? ` · ${g.variant}` : '', h('div', { class: 'muted' }, g.users.map((x) => (x.qty > 1 ? `${x.user} ${x.qty}×` : x.user)).join(', ')), g.price_differs ? h('div', { class: 'warn-text' }, t('⚠ Preis prüfen – zuletzt {p}', { p: eur(g.known_price_cents) })) : null),
                   h('td', { class: 'num' }, eur(g.price_cents)),
                   h('td', { class: 'num' }, eur(g.sum_cents))
                 )
@@ -626,13 +628,13 @@ function roundView(id) {
             h(
               'tfoot',
               null,
-              h('tr', null, h('td', { colspan: 3 }, 'Artikel'), h('td', { class: 'num' }, eur(d.items_total_cents))),
-              d.delivery_fee_cents ? h('tr', null, h('td', { colspan: 3 }, 'Lieferkosten'), h('td', { class: 'num' }, eur(d.delivery_fee_cents))) : null,
-              h('tr', null, h('td', { colspan: 3 }, 'Gesamt'), h('td', { class: 'num' }, eur(d.grand_total_cents)))
+              h('tr', null, h('td', { colspan: 3 }, t('Summe Artikel')), h('td', { class: 'num' }, eur(d.items_total_cents))),
+              d.delivery_fee_cents ? h('tr', null, h('td', { colspan: 3 }, t('Lieferkosten')), h('td', { class: 'num' }, eur(d.delivery_fee_cents))) : null,
+              h('tr', null, h('td', { colspan: 3 }, t('Gesamt')), h('td', { class: 'num' }, eur(d.grand_total_cents)))
             )
           )
-        : h('p', { class: 'muted' }, 'Noch keine Positionen.'),
-      h('div', { class: 'notice', style: 'margin-top:10px' }, h('strong', null, '⚠ Preise sind Angaben der User und nicht geprüft. '), 'Vor dem Bestellen mit der Karte abgleichen.'),
+        : h('p', { class: 'muted' }, t('Noch keine Positionen.')),
+      h('div', { class: 'notice', style: 'margin-top:10px' }, h('strong', null, t('⚠ Preise sind Angaben der User und nicht geprüft. ')), t('Vor dem Bestellen mit der Karte abgleichen.')),
       h(
         'div',
         { class: 'row', style: 'margin-top:10px' },
@@ -643,15 +645,15 @@ function roundView(id) {
             onclick: async () => {
               try {
                 await navigator.clipboard.writeText(orderText());
-                toast('Bestelltext kopiert');
+                toast(t('Bestelltext kopiert'));
               } catch {
-                toast('Kopieren nicht möglich');
+                toast(t('Kopieren nicht möglich'));
               }
             },
           },
-          'Text kopieren'
+          t('Text kopieren')
         ),
-        tel ? h('a', { class: 'btn small', style: 'text-decoration:none', href: tel }, 'Anrufen') : null
+        tel ? h('a', { class: 'btn small', style: 'text-decoration:none', href: tel }, t('Anrufen')) : null
       )
     );
   }
@@ -664,7 +666,7 @@ function roundView(id) {
     }
     debtsCard.classList.remove('hidden');
     debtsCard.replaceChildren(
-      h('h3', null, d.locked ? 'Offene Beträge' : 'Offene Beträge (vorläufig)'),
+      h('h3', null, d.locked ? t('Offene Beträge') : t('Offene Beträge (vorläufig)')),
       d.debts.length
         ? h(
             'ul',
@@ -679,14 +681,14 @@ function roundView(id) {
                   { class: 'row' },
                   h('strong', null, eur(x.amount_cents)),
                   lc(x.user) === lc(me) || d.viewer.can_manage
-                    ? h('button', { class: 'btn small ghost', onclick: () => toggle('paid', { user: x.user, value: true }) }, 'bezahlt')
+                    ? h('button', { class: 'btn small ghost', onclick: () => toggle('paid', { user: x.user, value: true }) }, t('bezahlt'))
                     : null
                 )
               )
             )
           )
-        : h('div', { class: 'banner ok' }, '✓ Alles bezahlt'),
-      d.debts.length ? h('div', { class: 'muted', style: 'margin-top:8px' }, `Zahlen an ${d.buyer}`, d.paypal ? [' via PayPal: ', ppLink ? h('a', { href: ppLink, target: '_blank', rel: 'noopener noreferrer' }, d.paypal) : d.paypal] : '') : null
+        : h('div', { class: 'banner ok' }, t('✓ Alles bezahlt')),
+      d.debts.length ? h('div', { class: 'muted', style: 'margin-top:8px' }, t('Zahlen an {buyer}', { buyer: d.buyer }), d.paypal ? [t(' via PayPal: '), ppLink ? h('a', { href: ppLink, target: '_blank', rel: 'noopener noreferrer' }, d.paypal) : d.paypal] : '') : null
     );
   }
 
@@ -694,7 +696,7 @@ function roundView(id) {
     if (!d) return;
     const left = d.expires_at - (Date.now() + skew);
     if (left <= 0) {
-      timerNum.textContent = 'GESPERRT';
+      timerNum.textContent = t('GESPERRT');
       timerNum.className = 'timer done';
       if (!d.locked && !expiredRefreshed) {
         expiredRefreshed = true;
@@ -712,7 +714,7 @@ function roundView(id) {
       try {
         d = await api('GET', `/rounds/${id}`);
       } catch (e) {
-        app.replaceChildren(h('div', { class: 'card' }, h('p', null, e.message), h('a', { href: '#/' }, '← Zurück')));
+        app.replaceChildren(h('div', { class: 'card' }, h('p', null, e.message), h('a', { href: '#/' }, t('← Zurück'))));
         clearInterval(tick);
         return;
       }
@@ -742,8 +744,8 @@ function statsView() {
   const body = h('div', { style: 'display:grid;gap:14px' });
   const scopeBtns = h('div', { class: 'tabs' });
   for (const [k, label] of [
-    ['last30', 'Letzte 30 Bestellungen'],
-    ['all', 'Alle'],
+    ['last30', t('Letzte 30 Bestellungen')],
+    ['all', t('Alle')],
   ]) {
     scopeBtns.append(
       h(
@@ -760,7 +762,7 @@ function statsView() {
       )
     );
   }
-  app.replaceChildren(h('h2', { style: 'margin:0' }, 'Statistik'), scopeBtns, body);
+  app.replaceChildren(h('h2', { style: 'margin:0' }, t('Statistik')), scopeBtns, body);
 
   return {
     async refresh() {
@@ -768,16 +770,16 @@ function statsView() {
       const s = await act(() => api('GET', `/stats?scope=${scope}`));
       if (!s) return;
       if (!s.rounds) {
-        body.replaceChildren(h('div', { class: 'card muted' }, 'Noch keine Daten.'));
+        body.replaceChildren(h('div', { class: 'card muted' }, t('Noch keine Daten.')));
         return;
       }
       body.replaceChildren(
         h(
           'section',
           { class: 'card grid3', style: 'grid-template-columns:1fr 1fr 1fr' },
-          h('div', null, h('div', { class: 'muted' }, 'Runden'), h('strong', null, String(s.rounds))),
-          h('div', null, h('div', { class: 'muted' }, 'Ø Preis Artikel'), h('strong', null, eur(s.avg_item_cents))),
-          h('div', null, h('div', { class: 'muted' }, 'Ø Bestellung/User'), h('strong', null, eur(s.avg_order_cents)))
+          h('div', null, h('div', { class: 'muted' }, t('Runden')), h('strong', null, String(s.rounds))),
+          h('div', null, h('div', { class: 'muted' }, t('Ø Preis Artikel')), h('strong', null, eur(s.avg_item_cents))),
+          h('div', null, h('div', { class: 'muted' }, t('Ø Bestellung/User')), h('strong', null, eur(s.avg_order_cents)))
         ),
         h(
           'section',
@@ -786,28 +788,13 @@ function statsView() {
           h(
             'table',
             null,
-            h('thead', null, h('tr', null, h('th', null, 'Restaurant'), h('th', { class: 'num' }, 'Runden'), h('th', { class: 'num' }, 'Artikel'), h('th', null, 'Beliebtestes Gericht'))),
+            h('thead', null, h('tr', null, h('th', null, 'Restaurant'), h('th', { class: 'num' }, t('Runden')), h('th', { class: 'num' }, t('Artikel')), h('th', null, t('Beliebtestes Gericht')))),
             h(
               'tbody',
               null,
               s.restaurants.map((r) =>
                 h('tr', null, h('td', null, r.name), h('td', { class: 'num' }, String(r.rounds)), h('td', { class: 'num' }, String(r.items)), h('td', null, r.top_dish ? `${r.top_dish} (${r.top_dish_qty}×)` : '—'))
               )
-            )
-          )
-        ),
-        h(
-          'section',
-          { class: 'card' },
-          h('h3', null, 'Pro User'),
-          h(
-            'table',
-            null,
-            h('thead', null, h('tr', null, h('th', null, 'User'), h('th', { class: 'num' }, 'Bestell.'), h('th', { class: 'num' }, 'Ø Artikel'), h('th', { class: 'num' }, 'Ø Bestellung'))),
-            h(
-              'tbody',
-              null,
-              s.users.map((u) => h('tr', null, h('td', null, u.user), h('td', { class: 'num' }, String(u.orders)), h('td', { class: 'num' }, eur(u.avg_item_cents)), h('td', { class: 'num' }, eur(u.avg_order_cents))))
             )
           )
         )
