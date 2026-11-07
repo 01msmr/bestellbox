@@ -12,7 +12,7 @@ alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt
 - **Katalog pro Restaurant:** Namen und Varianten aus früheren Bestellungen werden ab der 2. Nutzung vorgeschlagen.
   Der **Preis wird nie vorausgefüllt**; ein Chip „zuletzt X € (ungeprüft)“ muss aktiv übernommen werden.
   Preisabweichungen werden beim Eintragen und im Bestell-Tab markiert. Die Verantwortung für den Preis liegt beim User.
-- **Drei Tabs:** *Nach Usern*, *Meine*, *Bestellen* (gebündelte Sammelliste zum Telefonieren/Kopieren).
+- **Drei Tabs:** *Nach Usern*, *Meine*, *Bestellen* (gebündelte Sammelbestellung zum Telefonieren/Kopieren).
 - **Status:** `fertig` und `bezahlt` sind zwei unabhängige Häkchen pro User, für alle sichtbar.
 - **Warnbanner**, solange nicht alle fertig sind.
 - **Frist** (Standard 20 min, beim Anlegen einstellbar, `+5 min`). Nach Ablauf ist die Runde gesperrt;

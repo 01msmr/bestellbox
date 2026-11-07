@@ -79,7 +79,7 @@ const EN = {
   'Fertig = deine Bestellung ist komplett. Bezahlt = du hast dem Besteller dein Geld gegeben.':
     'Done = your order is complete. Paid = you have given the buyer your money.',
   // Bestellen
-  'Sammelliste': 'Combined list',
+  'Sammelbestellung': 'Combined order',
   'Einzel': 'Each',
   'Summe': 'Total',
   'Summe Artikel': 'Items total',

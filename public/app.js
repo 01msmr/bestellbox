@@ -657,7 +657,7 @@ function roundView(id) {
   function renderOrder() {
     const tel = telHref(d.restaurant.phone);
     orderPane.replaceChildren(
-      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Sammelliste')), contactLinks(d.restaurant)),
+      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Sammelbestellung')), contactLinks(d.restaurant)),
       d.groups.length
         ? h(
             'table',
