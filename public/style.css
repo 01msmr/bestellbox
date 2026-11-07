@@ -172,8 +172,10 @@ a.btn { text-decoration: none; text-align: center; }
 .side-item:hover { background: var(--surface); }
 .side-item.active { background: var(--surface); border-color: var(--line); font-weight: 600; }
 .side-item .sub { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 13px; font-weight: 400; color: var(--muted); }
-@media (min-width: 1000px) {
-  .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); }
+@media (min-width: 700px) {
+  .layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); }
   #side { display: block; position: sticky; top: 53px; height: calc(100vh - 53px); overflow: auto; padding: 12px; border-right: 1px solid var(--line); }
   .home-lists { display: none; }
+  .side-item .sub { flex-wrap: wrap; }
 }
+@media (min-width: 1000px) { .layout { grid-template-columns: 280px minmax(0, 1fr); } }
