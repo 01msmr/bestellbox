@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { LIMITS, DEFAULTS, LISTS } from './public/config.js';
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -91,11 +92,11 @@ export function foldKey(s) {
 
 /** Variante ist Freitext (z. B. „26 cm“, „Fladenbrot, scharf“); verglichen wird nur Schreibweise-bereinigt. */
 export function parseVariant(v) {
-  const variant = collapse(v).slice(0, 80);
+  const variant = collapse(v).slice(0, LIMITS.variant);
   return { variant, vkey: foldKey(variant) };
 }
 
-function parseMoneyToCents(v, { max = 1000 } = {}) {
+function parseMoneyToCents(v, { max = LIMITS.priceMaxEuro } = {}) {
   const n = typeof v === 'number' ? v : Number(String(v ?? '').trim().replace(',', '.'));
   if (!Number.isFinite(n) || n < 0 || n > max) throw new HttpError(400, 'Ungültiger Betrag');
   return Math.round(n * 100);
@@ -103,7 +104,7 @@ function parseMoneyToCents(v, { max = 1000 } = {}) {
 
 function cleanUser(u) {
   const name = collapse(u);
-  if (!name || name.length > 32) throw new HttpError(400, 'Username fehlt oder ist zu lang (max. 32)');
+  if (!name || name.length > LIMITS.userName) throw new HttpError(400, 'Username fehlt oder ist zu lang (max. 32)');
   return name;
 }
 
@@ -174,9 +175,9 @@ export function createLogic(db, { admins = [] } = {}) {
 
   function upsertRestaurant({ name, url = '', phone = '' }) {
     const n = collapse(name);
-    if (!n || n.length > 80) throw new HttpError(400, 'Restaurantname fehlt oder ist zu lang');
-    const u = collapse(url).slice(0, 300);
-    const p = collapse(phone).slice(0, 40);
+    if (!n || n.length > LIMITS.restaurantName) throw new HttpError(400, 'Restaurantname fehlt oder ist zu lang');
+    const u = collapse(url).slice(0, LIMITS.restaurantUrl);
+    const p = collapse(phone).slice(0, LIMITS.restaurantPhone);
     const existing = q.restByKey.get(lower(n));
     if (existing) {
       // Leere Eingaben überschreiben gespeicherte Werte nicht.
@@ -198,10 +199,10 @@ export function createLogic(db, { admins = [] } = {}) {
     user = cleanUser(user);
     const restaurantId = upsertRestaurant(body.restaurant ?? {});
     const buyer = cleanUser(body.buyer || user);
-    const paypal = collapse(body.paypal).slice(0, 120) || (q.profGet.get(lower(buyer))?.paypal ?? '');
-    const fee = body.delivery_fee === undefined || body.delivery_fee === '' ? 0 : parseMoneyToCents(body.delivery_fee, { max: 100 });
-    const minutes = body.minutes === undefined || body.minutes === '' ? 20 : Number(body.minutes);
-    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 240) throw new HttpError(400, 'Ablaufzeit 1–240 Minuten');
+    const paypal = collapse(body.paypal).slice(0, LIMITS.paypal) || (q.profGet.get(lower(buyer))?.paypal ?? '');
+    const fee = body.delivery_fee === undefined || body.delivery_fee === '' ? 0 : parseMoneyToCents(body.delivery_fee, { max: LIMITS.feeMaxEuro });
+    const minutes = body.minutes === undefined || body.minutes === '' ? DEFAULTS.deadlineMinutes : Number(body.minutes);
+    if (!Number.isFinite(minutes) || minutes < LIMITS.deadlineMinMinutes || minutes > LIMITS.deadlineMaxMinutes) throw new HttpError(400, 'Ablaufzeit 1–240 Minuten');
     const now = Date.now();
     const id = Number(q.roundInsert.run(restaurantId, user, buyer, paypal, fee, now, now + minutes * 60000).lastInsertRowid);
     if (paypal) q.profSet.run(lower(buyer), paypal);
@@ -213,8 +214,8 @@ export function createLogic(db, { admins = [] } = {}) {
     const r = getRound(id);
     if (!canManage(r, user)) throw new HttpError(403, 'Nur Ersteller, Besteller oder Admins');
     const buyer = body.buyer !== undefined ? cleanUser(body.buyer) : r.buyer;
-    const paypal = body.paypal !== undefined ? collapse(body.paypal).slice(0, 120) : r.paypal;
-    const fee = body.delivery_fee !== undefined ? parseMoneyToCents(body.delivery_fee, { max: 100 }) : r.delivery_fee_cents;
+    const paypal = body.paypal !== undefined ? collapse(body.paypal).slice(0, LIMITS.paypal) : r.paypal;
+    const fee = body.delivery_fee !== undefined ? parseMoneyToCents(body.delivery_fee, { max: LIMITS.feeMaxEuro }) : r.delivery_fee_cents;
     q.roundUpdate.run(buyer, paypal, fee, r.id);
     if (body.approve) { q.partApprove.run(r.id, cleanUser(body.approve)); autoLock(r.id); }
     if (body.reject) q.partDrop.run(r.id, cleanUser(body.reject));
@@ -243,13 +244,13 @@ export function createLogic(db, { admins = [] } = {}) {
     if (action === 'lock') {
       q.roundExpiry.run(now, r.id);
     } else if (action === 'extend') {
-      const m = minutes === undefined ? 5 : Number(minutes);
-      if (!Number.isFinite(m) || m < 1 || m > 120) throw new HttpError(400, 'Verlängerung 1–120 Minuten');
+      const m = minutes === undefined ? DEFAULTS.extendMinutes : Number(minutes);
+      if (!Number.isFinite(m) || m < LIMITS.deadlineMinMinutes || m > LIMITS.extendMaxMinutes) throw new HttpError(400, 'Verlängerung 1–120 Minuten');
       // Bei abgelaufener Runde (Wieder-Öffnen) ab jetzt rechnen.
       q.roundExpiry.run(Math.max(now, r.expires_at) + m * 60000, r.id);
     } else if (action === 'set') {
       const m = Number(minutes);
-      if (!Number.isFinite(m) || m < 1 || m > 240) throw new HttpError(400, 'Ablaufzeit 1–240 Minuten');
+      if (!Number.isFinite(m) || m < LIMITS.deadlineMinMinutes || m > LIMITS.deadlineMaxMinutes) throw new HttpError(400, 'Ablaufzeit 1–240 Minuten');
       q.roundExpiry.run(now + m * 60000, r.id);
     } else {
       throw new HttpError(400, 'Unbekannte Aktion');
@@ -258,10 +259,10 @@ export function createLogic(db, { admins = [] } = {}) {
 
   function parseItem(body) {
     const article = collapse(body.article);
-    if (!article || article.length > 80) throw new HttpError(400, 'Artikel fehlt oder ist zu lang');
+    if (!article || article.length > LIMITS.article) throw new HttpError(400, 'Artikel fehlt oder ist zu lang');
     const price = parseMoneyToCents(body.price);
     const qty = body.qty === undefined || body.qty === '' ? 1 : Number(body.qty);
-    if (!Number.isInteger(qty) || qty < 1 || qty > 99) throw new HttpError(400, 'Menge 1–99');
+    if (!Number.isInteger(qty) || qty < LIMITS.qtyMin || qty > LIMITS.qtyMax) throw new HttpError(400, 'Menge 1–99');
     const akey = foldKey(article);
     if (!akey) throw new HttpError(400, 'Artikel fehlt oder ist zu lang');
     const { variant, vkey } = parseVariant(body.variant);
@@ -427,7 +428,7 @@ export function createLogic(db, { admins = [] } = {}) {
     };
   }
 
-  function listRounds(viewer = '', limit = 60) {
+  function listRounds(viewer = '', limit = LISTS.rounds) {
     const now = Date.now();
     return q.roundList.all(limit).map(({ id }) => {
       const d = roundDetail(id, viewer, now, { withPrices: false });
@@ -473,7 +474,7 @@ export function createLogic(db, { admins = [] } = {}) {
       v.price_cents = row.price_cents; // nach id sortiert → zuletzt gesetzter Preis
     }
     return [...entries.values()]
-      .filter((e) => e.uses >= 2)
+      .filter((e) => e.uses >= LISTS.catalogMinUses)
       .map((e) => ({
         article: top(e.spell, e.last),
         uses: e.uses,
@@ -482,11 +483,11 @@ export function createLogic(db, { admins = [] } = {}) {
           .sort((a, b) => b.count - a.count),
       }))
       .sort((a, b) => b.uses - a.uses || a.article.localeCompare(b.article, 'de'))
-      .slice(0, 300);
+      .slice(0, LISTS.catalogMax);
   }
 
   function stats(scope = 'all') {
-    const limitSql = scope === 'last30' ? 'ORDER BY created_at DESC, id DESC LIMIT 30' : '';
+    const limitSql = scope === 'last30' ? `ORDER BY created_at DESC, id DESC LIMIT ${LISTS.statsLast}` : '';
     const ids = db.prepare(`SELECT id FROM rounds ${limitSql}`).all().map((r) => r.id);
     if (!ids.length) return { scope, rounds: 0, restaurants: [], avg_item_cents: 0, avg_order_cents: 0 };
     const ph = ids.map(() => '?').join(',');

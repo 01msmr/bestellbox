@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openDb, createLogic, HttpError } from './db.js';
+import { LIMITS, TIMING } from './public/config.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -28,7 +29,7 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
 
   const heartbeat = setInterval(() => {
     for (const res of clients) res.write(': ping\n\n');
-  }, 25000);
+  }, TIMING.sseHeartbeatMs);
   heartbeat.unref();
 
   async function readJson(req) {
@@ -36,7 +37,7 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
     let size = 0;
     for await (const c of req) {
       size += c.length;
-      if (size > 64 * 1024) throw new HttpError(413, 'Zu groß');
+      if (size > LIMITS.requestBodyBytes) throw new HttpError(413, 'Zu groß');
       chunks.push(c);
     }
     if (!chunks.length) return {};
@@ -51,7 +52,7 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
     const raw = req.headers['x-user'];
     if (!raw) return '';
     try {
-      return decodeURIComponent(String(raw)).trim().slice(0, 32);
+      return decodeURIComponent(String(raw)).trim().slice(0, LIMITS.userName);
     } catch {
       return '';
     }
@@ -71,7 +72,7 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
 
     if (method === 'GET' && p === '/api/events') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
-      res.write('retry: 2000\n\n');
+      res.write(`retry: ${TIMING.sseRetryMs}\n\n`);
       clients.add(res);
       req.on('close', () => clients.delete(res));
       return;

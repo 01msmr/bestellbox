@@ -33,6 +33,31 @@ alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt
 - **Sprache:** Deutsch/Englisch, automatisch nach Browsersprache, manuell umschaltbar (◐-Panel).
   Neue Texte: deutscher Text ist der Schlüssel, Englisch steht in `public/i18n.js`.
 
+## Code-Struktur
+
+```
+server.js            HTTP-Server, Routen, SSE (/api/events), statische Dateien
+db.js                SQLite-Schema, Geschäftslogik (createLogic), Rechte, Validierung
+public/config.js     ZENTRALE WERTE: Grenzen (LIMITS), Voreinstellungen (DEFAULTS), Listen (LISTS), Zeiten (TIMING)
+                     – von Server und Frontend gemeinsam genutzt
+public/index.html    Gerüst: Header/Navi, Sidebar, Hauptbereich
+public/app.js        Einstieg: Namensabfrage, Router (#/, #/r/<Nr>, #/stats), Live-Updates
+public/util.js       Helfer: DOM-Builder h(), api(), Formatierung, Name (me)
+public/side.js       Sidebar mit allen Bestellungen, Countdown-Badges
+public/views/        home.js (Start), round.js (Bestellseite), stats.js (Statistik)
+public/i18n.js       Übersetzungen (deutscher Text = Schlüssel, EN-Tabelle)
+public/theme.js      Modus (Auto/Hell/Dunkel), Farbthema, Sprache
+public/style.css     Styles; Farben als CSS-Variablen mit light-dark()
+test/api.test.js     API-Tests (node --test)
+```
+
+Hinweise für Weiterentwicklung:
+
+- Im Code heißt eine Bestellung noch **round** (Tabelle `rounds`, `/api/rounds`); im Frontend heißt sie „Bestellung“.
+- Neuer Text im Frontend: immer `t('Deutscher Text')` verwenden und die EN-Übersetzung in `public/i18n.js` ergänzen.
+- Fehlertexte in `db.js` nennen Grenzen als Text („1–240 Minuten“); bei Änderung in `config.js` dort und in `i18n.js` mitziehen.
+- Jede Ansicht liefert `{ refresh(), destroy() }`; der Router ruft `refresh()` auch bei Live-Updates auf.
+
 ## Start
 
 Node ≥ 22.13, keine Abhängigkeiten (nutzt `node:sqlite`).
