@@ -17,6 +17,7 @@ alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt
 - **Warnbanner**, solange nicht alle fertig sind.
 - **Frist** (Standard 20 min, beim Anlegen einstellbar, `+5 min`). Nach Ablauf ist die Runde gesperrt;
   Ersteller, Besteller und Admins können sie wieder öffnen.
+- **Schließen, wenn alle fertig:** Option im Zeitfeld (Ersteller/Besteller/Admins); sperrt automatisch, sobald alle User mit Artikeln „fertig“ sind.
 - **Bestellt von** + PayPal-Adresse/Link und **Lieferkosten** (anteilig nach Artikelsumme verteilt).
 - **Bezahlen:** Block mit PayPal-Adresse des Bestellers (kopierbar) und, bei paypal.me-Adressen, einem Link mit dem
   eigenen Betrag. PayPal-Adresse (je Besteller) und Lieferkosten (je Restaurant) werden gemerkt und bei der nächsten

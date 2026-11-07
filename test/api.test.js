@@ -179,3 +179,21 @@ test('Gemerkte Lieferkosten/PayPal, PayPal geschützt', async () => {
     await close();
   }
 });
+
+test('Schließen, wenn alle fertig', async () => {
+  const { call, close } = await boot();
+  try {
+    const id = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Roma' }, minutes: 20 })).body.id;
+    await call('POST', `/api/rounds/${id}/items`, 'uli', { article: 'Pizza', price: '8' });
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cola', price: '2' });
+    let r = await call('PATCH', `/api/rounds/${id}`, 'anna', { close_when_ready: true });
+    assert.equal(r.status, 403, 'nur Verwalter');
+    r = await call('PATCH', `/api/rounds/${id}`, 'uli', { close_when_ready: true });
+    assert.equal(r.body.close_when_ready, true);
+    assert.equal(r.body.locked, false);
+    await call('POST', `/api/rounds/${id}/done`, 'uli', { value: true });
+    assert.equal((await call('GET', `/api/rounds/${id}`, 'uli')).body.locked, false, 'anna noch nicht fertig');
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    assert.equal((await call('GET', `/api/rounds/${id}`, 'uli')).body.locked, true, 'alle fertig -> gesperrt');
+  } finally { await close(); }
+});

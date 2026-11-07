@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS rounds (
   paypal TEXT NOT NULL DEFAULT '',
   delivery_fee_cents INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
-  expires_at INTEGER NOT NULL
+  expires_at INTEGER NOT NULL,
+  close_when_ready INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS participants (
   round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
@@ -59,6 +60,8 @@ export function openDb(file = ':memory:') {
   const cols = db.prepare('PRAGMA table_info(items)').all().map((c) => c.name);
   if (!cols.includes('variant')) db.exec("ALTER TABLE items ADD COLUMN variant TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('vkey')) db.exec("ALTER TABLE items ADD COLUMN vkey TEXT NOT NULL DEFAULT ''");
+  const rcols = db.prepare('PRAGMA table_info(rounds)').all().map((c) => c.name);
+  if (!rcols.includes('close_when_ready')) db.exec('ALTER TABLE rounds ADD COLUMN close_when_ready INTEGER NOT NULL DEFAULT 0');
   return db;
 }
 
@@ -141,6 +144,7 @@ export function createLogic(db, { admins = [] } = {}) {
     ),
     roundList: db.prepare('SELECT id FROM rounds ORDER BY created_at DESC, id DESC LIMIT ?'),
     roundUpdate: db.prepare('UPDATE rounds SET buyer = ?, paypal = ?, delivery_fee_cents = ? WHERE id = ?'),
+    roundCwr: db.prepare('UPDATE rounds SET close_when_ready = ? WHERE id = ?'),
     roundExpiry: db.prepare('UPDATE rounds SET expires_at = ? WHERE id = ?'),
     partUpsert: db.prepare('INSERT OR IGNORE INTO participants (round_id, user) VALUES (?, ?)'),
     partAll: db.prepare('SELECT user, done, paid FROM participants WHERE round_id = ? ORDER BY rowid'),
@@ -204,7 +208,21 @@ export function createLogic(db, { admins = [] } = {}) {
     const paypal = body.paypal !== undefined ? collapse(body.paypal).slice(0, 120) : r.paypal;
     const fee = body.delivery_fee !== undefined ? parseMoneyToCents(body.delivery_fee, { max: 100 }) : r.delivery_fee_cents;
     q.roundUpdate.run(buyer, paypal, fee, r.id);
+    if (body.close_when_ready !== undefined) {
+      q.roundCwr.run(body.close_when_ready ? 1 : 0, r.id);
+      if (body.close_when_ready) autoLock(r.id);
+    }
     if (paypal) q.profSet.run(lower(buyer), paypal);
+  }
+
+  // „Schließen, wenn alle fertig“: sperrt, sobald alle echten User (mit mindestens einem Artikel) fertig sind.
+  function autoLock(roundId) {
+    const r = getRound(roundId);
+    const now = Date.now();
+    if (!r.close_when_ready || isLocked(r, now)) return;
+    const d = roundDetail(roundId, '', now);
+    const actual = d.users.filter((u) => u.subtotal_cents > 0);
+    if (actual.length && actual.every((u) => u.done)) q.roundExpiry.run(now, r.id);
   }
 
   function changeTime(user, id, { action, minutes }) {
@@ -288,6 +306,7 @@ export function createLogic(db, { admins = [] } = {}) {
     const value = body.value ? 1 : 0;
     q.partUpsert.run(r.id, target);
     (flag === 'done' ? q.partSetDone : q.partSetPaid).run(value, r.id, target);
+    if (flag === 'done' && value) autoLock(r.id);
     return r.id;
   }
 
@@ -368,6 +387,7 @@ export function createLogic(db, { admins = [] } = {}) {
       delivery_fee_cents: r.delivery_fee_cents,
       created_at: r.created_at,
       expires_at: r.expires_at,
+      close_when_ready: !!r.close_when_ready,
       server_now: now,
       locked,
       users,

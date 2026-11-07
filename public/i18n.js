@@ -61,6 +61,8 @@ const EN = {
   'Speichern': 'Save',
   'Bestellfrist abgelaufen – Bestellung gesperrt': 'Deadline passed – order locked',
   'Bestellfrist': 'Order deadline',
+  'Schließen, wenn alle fertig': 'Close when all are ready',
+  'Schließt, sobald alle fertig sind': 'Closes as soon as everyone is ready',
   'Jetzt sperren': 'Lock now',
   'Wieder öffnen': 'Reopen',
   'GESPERRT': 'LOCKED',

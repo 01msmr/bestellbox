@@ -522,6 +522,13 @@ function roundView(id) {
       if (!d.locked) buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('lock') }, t('Jetzt sperren')));
       else buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('extend', 5) }, t('Wieder öffnen')));
     }
+    if (d.viewer.can_manage) {
+      const cb = h('input', { type: 'checkbox', onchange: () => act(() => api('PATCH', `/rounds/${id}`, { close_when_ready: cb.checked })).then(() => current.refresh()) });
+      cb.checked = d.close_when_ready;
+      buttons.push(h('label', { class: 'row muted', style: 'gap:6px;width:100%' }, cb, t('Schließen, wenn alle fertig')));
+    } else if (d.close_when_ready && !d.locked) {
+      buttons.push(h('div', { class: 'muted' }, t('Schließt, sobald alle fertig sind')));
+    }
     timerBtns.replaceChildren(...buttons);
   }
   async function timeAction(action, minutes) {
