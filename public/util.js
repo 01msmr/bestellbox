@@ -117,3 +117,13 @@ export function parseMoney(v) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+
+// ---------- Bestellbot als visueller Sprecher ----------
+const BOT_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v3"/><circle cx="12" cy="2.6" r=".9" fill="currentColor"/><rect x="4" y="6" width="16" height="13" rx="5"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><path d="M9.5 16h5"/></svg>';
+
+/** Roboterkopf mit Sprechblase – ersetzt Text wie „Bestellbot meldet:“. mood: 'ok' | 'warn' (Farbe des Kopfs). */
+export function botSay(text, mood = '') {
+  const head = h('span', { class: 'bot-head' + (mood ? ' ' + mood : '') });
+  head.innerHTML = BOT_SVG;
+  return h('div', { class: 'bot-say' }, head, h('span', { class: 'bubble' }, text));
+}

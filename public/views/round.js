@@ -1,7 +1,7 @@
 // Bestellseite: Frist, Banner, Bezahlen, Tabs (Nach Usern / Meine / Bestellen), offene Beträge.
 import { t } from '/i18n.js';
 import { LIMITS, DEFAULTS, LISTS, TIMING } from '/config.js';
-import { app, eur, fmtDate, lc, h, toast, api, act, me, telHref, payHref, contactLinks, fmtRemaining, fold, parseMoney, nav } from '/util.js';
+import { app, eur, fmtDate, lc, h, toast, api, act, me, telHref, payHref, contactLinks, botSay, fmtRemaining, fold, parseMoney, nav } from '/util.js';
 
 export function roundView(id) {
   let d = null;
@@ -202,11 +202,11 @@ export function roundView(id) {
   function renderBanners() {
     const b = [];
     if (d.ready.total === 0) {
-      b.push(h('div', { class: 'banner warn' }, t('Piep! Noch keine Artikel – trag deine ein.')));
+      b.push(h('div', { class: 'banner warn' }, botSay(t('Noch keine Artikel – trag deine ein.'), 'warn')));
     } else if (d.ready.not_ready.length) {
       b.push(h('div', { class: 'banner warn' }, t('⚠ Noch nicht alle fertig ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
     } else {
-      b.push(h('div', { class: 'banner ok' }, t('✓ Alle fertig ({total}/{total}) – Bestellbot meldet: kann bestellt werden', { total: d.ready.total })));
+      b.push(h('div', { class: 'banner ok' }, botSay(t('Alle fertig ({total}/{total}) – kann bestellt werden', { total: d.ready.total }), 'ok')));
     }
     if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('💸 Bestellung unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
     for (const u of d.pending) {
@@ -238,7 +238,7 @@ export function roundView(id) {
 
   function renderUsers() {
     if (!d.users.length) {
-      usersPane.replaceChildren(h('div', { class: 'card muted' }, t('Noch niemand dabei.')));
+      usersPane.replaceChildren(h('div', { class: 'card' }, botSay(t('Noch niemand dabei.'))));
       return;
     }
     usersPane.replaceChildren(
