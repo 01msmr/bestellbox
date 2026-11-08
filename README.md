@@ -1,4 +1,4 @@
-# bestellbox
+# bestellbot
 
 Gemeinsame Essensbestellung für die Toolbox Bodensee. Eine Person startet eine **Bestellung** bei einem Restaurant,
 alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt**. Alle sehen live denselben Stand.
@@ -72,10 +72,10 @@ npm test
 |-----------|------------------------|-------------------------------|
 | `HOST`    | `127.0.0.1`            | Bind-Adresse                  |
 | `PORT`    | `3000`                 | Port                          |
-| `DB_FILE` | `./data/bestellbox.db` | SQLite-Datei                  |
+| `DB_FILE` | `./data/bestellbot.db` | SQLite-Datei                  |
 | `ADMINS`  | leer                   | Usernamen, kommagetrennt      |
 
-Docker: `docker compose up -d` (Daten im Volume `bestellbox-data`).
+Docker: `docker compose up -d` (Daten im Volume `bestellbot-data`).
 
 ## Hinweis zur Sicherheit
 

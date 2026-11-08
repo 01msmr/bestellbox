@@ -176,10 +176,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const port = Number(process.env.PORT ?? 3000);
   const host = process.env.HOST ?? '127.0.0.1';
   const admins = (process.env.ADMINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const dbFile = process.env.DB_FILE ?? './data/bestellbox.db';
+  const dbFile = process.env.DB_FILE ?? './data/bestellbot.db';
   if (dbFile !== ':memory:') mkdirSync(path.dirname(path.resolve(dbFile)), { recursive: true });
   const server = createApp({ dbFile, admins });
-  server.listen(port, host, () => console.log(`bestellbox läuft auf http://${host}:${port}`));
+  server.listen(port, host, () => console.log(`bestellbot läuft auf http://${host}:${port}`));
   const stop = () => {
     server.closeAllConnections?.();
     server.close(() => process.exit(0));

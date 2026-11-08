@@ -1,4 +1,4 @@
-// bestellbox – Frontend (Vanilla JS, ES-Module, keine Build-Schritte)
+// bestellbot – Frontend (Vanilla JS, ES-Module, keine Build-Schritte)
 // Einstieg: Name wählen, Router (#/, #/r/<Nr>, #/stats), Live-Updates per SSE.
 import { t } from '/i18n.js';
 import { LIMITS, TIMING } from '/config.js';

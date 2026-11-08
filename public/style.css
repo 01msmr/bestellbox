@@ -1,4 +1,4 @@
-/* bestellbox – minimalistisch. Modus (auto/hell/dunkel) über color-scheme + light-dark(),
+/* bestellbot – minimalistisch. Modus (auto/hell/dunkel) über color-scheme + light-dark(),
    Farbthema über [data-theme] (mono = schwarz/weiß, ozean, beere). */
 
 :root { color-scheme: light dark; }
@@ -179,3 +179,6 @@ a.btn { text-decoration: none; text-align: center; }
   .side-item .sub { flex-wrap: wrap; }
 }
 @media (min-width: 1000px) { .layout { grid-template-columns: 280px minmax(0, 1fr); } }
+
+.brand { display: inline-flex; align-items: center; gap: 7px; }
+.brand .logo { flex: none; }
