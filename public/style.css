@@ -107,10 +107,12 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 button.badge { cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
 button.badge:hover { filter: brightness(1.12); }
 
-.banner { border-radius: var(--radius); padding: 11px 14px; font-weight: 600; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-left: 6px solid var(--line); }
-.banner.warn { border-left-color: var(--warn); }
-.banner.ok { border-left-color: var(--ok); }
-.banner.bad { border-left-color: var(--bad); }
+.banner, .notice { position: relative; overflow: hidden; }
+.banner::before, .notice::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--line); }
+.banner { border-radius: var(--radius); padding: 11px 14px 11px 20px; font-weight: 600; background: var(--surface); color: var(--fg); border: 1px solid var(--line); }
+.banner.warn::before, .notice::before { background: var(--warn); }
+.banner.ok::before { background: var(--ok); }
+.banner.bad::before { background: var(--bad); }
 
 /* Timer */
 .timer { font: 650 40px/1.1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
@@ -146,7 +148,7 @@ details > summary { cursor: pointer; font-weight: 600; }
 .pill:hover { background: var(--surface); }
 .pill.price { border-color: var(--accent); color: var(--accent); }
 .warn-text { color: var(--bad-text); font-size: 14px; font-weight: 600; }
-.notice { padding: 9px 12px; border: 1px solid var(--line); border-left: 6px solid var(--warn); border-radius: var(--radius); background: var(--surface); font-size: 14px; }
+.notice { padding: 9px 12px 9px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); font-size: 14px; }
 
 /* Rundenseite: mobil einspaltig; Tablet breiter; Desktop zwei Spalten (links Tabs, rechts Frist/Banner/Bezahlen) */
 .round-grid, .round-side, .round-main { display: grid; gap: 16px; align-content: start; }
