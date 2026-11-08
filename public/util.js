@@ -33,9 +33,7 @@ export function h(tag, props, ...kids) {
 
 let toastTimer;
 export function toast(msg) {
-  const head = h('span', { class: 'bot-head mini' });
-  head.innerHTML = BOT_SVG;
-  toastEl.replaceChildren(head, h('span', null, msg));
+  toastEl.textContent = msg;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), TIMING.toastMs);
@@ -119,13 +117,3 @@ export function parseMoney(v) {
   return Number.isFinite(n) ? n : NaN;
 }
 
-
-// ---------- Bestellbot als visueller Sprecher ----------
-export const BOT_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8v3"/><circle cx="12" cy="2.4" r=".8" fill="currentColor" stroke="none"/><rect x="3.5" y="5.8" width="17" height="15" rx="5"/><g id="b" stroke-width="1.5"><path d="M8 9.2v7.4"/><circle cx="9.9" cy="14.2" r="1.9"/></g><use href="#b" x="6"/></svg>';
-
-/** Roboterkopf mit Sprechblase – ersetzt Text wie „Bestellbot meldet:“. mood: 'ok' | 'warn' (Farbe des Kopfs). */
-export function botSay(text, mood = '') {
-  const head = h('span', { class: 'bot-head' + (mood ? ' ' + mood : '') });
-  head.innerHTML = BOT_SVG;
-  return h('div', { class: 'bot-say' }, head, h('span', { class: 'bubble' }, text));
-}

@@ -2,7 +2,7 @@
 // Einstieg: Name wählen, Router (#/, #/r/<Nr>, #/stats), Live-Updates per SSE.
 import { t } from '/i18n.js';
 import { LIMITS, TIMING } from '/config.js';
-import { app, h, me, setMe, nav, BOT_SVG } from '/util.js';
+import { app, h, me, setMe, nav } from '/util.js';
 import { loadSide } from '/side.js';
 import { homeView } from '/views/home.js';
 import { roundView } from '/views/round.js';
@@ -76,6 +76,5 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ---------- Start ----------
-document.getElementById('logo').innerHTML = BOT_SVG;
 setMe(me);
 route();

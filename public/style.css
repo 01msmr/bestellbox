@@ -135,7 +135,7 @@ tfoot td { font-weight: 650; border-bottom: 0; border-top: 1px solid var(--line)
 .round-link:hover .card { background: var(--surface); }
 details > summary { cursor: pointer; font-weight: 600; }
 
-#toast { width: max-content; max-width: calc(100vw - 32px); display: flex; align-items: center; gap: 8px; position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 8px 16px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s; font-size: 14px; }
+#toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 8px 16px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s; font-size: 14px; }
 #toast.show { opacity: .94; }
 
 /* Vorschläge unter der Eingabe (Namen, Varianten, bekannter Preis) */
@@ -179,22 +179,3 @@ a.btn { text-decoration: none; text-align: center; }
   .side-item .sub { flex-wrap: wrap; }
 }
 @media (min-width: 1000px) { .layout { grid-template-columns: 280px minmax(0, 1fr); } }
-
-.brand { display: inline-flex; align-items: center; gap: 7px; }
-.brand .logo { flex: none; display: inline-flex; width: 24px; height: 24px; }
-.brand .logo svg { width: 24px; height: 24px; }
-
-/* Bestellbot als Sprecher: Roboterkopf + Sprechblase */
-.bot-say { display: flex; align-items: center; gap: 10px; }
-.bot-head { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line); color: var(--fg); }
-.bot-head svg { width: 22px; height: 22px; }
-.bot-head.ok { color: var(--ok-text); }
-.bot-head.warn { color: var(--fg); }
-.bot-say .bubble { position: relative; }
-
-#toast .bot-head.mini { width: 26px; height: 26px; margin: -3px 0 -3px -10px; background: var(--bg); color: var(--fg); border-color: transparent; }
-#toast .bot-head.mini svg { width: 18px; height: 18px; }
-
-/* Schmale Handys: im Kopf nur das Logo, der Name steht im Tab-Titel */
-.chip { white-space: nowrap; }
-@media (max-width: 480px) { .brand > span:last-child { display: none; } .top { gap: 10px; } }
