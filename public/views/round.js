@@ -187,7 +187,7 @@ export function roundView(id) {
     if (d.viewer.can_manage) {
       const cb = h('input', { type: 'checkbox', onchange: () => act(() => api('PATCH', `/rounds/${id}`, { close_when_ready: cb.checked })).then(() => nav.current.refresh()) });
       cb.checked = d.close_when_ready;
-      buttons.push(h('label', { class: 'row muted', style: 'gap:6px;width:100%' }, cb, t('Schließen, wenn alle fertig')));
+      buttons.push(h('label', { class: 'muted', style: 'display:flex;gap:6px;align-items:center;width:100%;font-size:14px' }, cb, t('Schließen, wenn alle fertig')));
     } else if (d.close_when_ready && !d.locked) {
       buttons.push(h('div', { class: 'muted' }, t('Schließt, sobald alle fertig sind')));
     }
