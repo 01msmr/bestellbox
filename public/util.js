@@ -33,7 +33,9 @@ export function h(tag, props, ...kids) {
 
 let toastTimer;
 export function toast(msg) {
-  toastEl.textContent = msg;
+  const head = h('span', { class: 'bot-head mini' });
+  head.innerHTML = BOT_SVG;
+  toastEl.replaceChildren(head, h('span', null, msg));
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), TIMING.toastMs);
@@ -119,7 +121,7 @@ export function parseMoney(v) {
 
 
 // ---------- Bestellbot als visueller Sprecher ----------
-const BOT_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v3"/><circle cx="12" cy="2.6" r=".9" fill="currentColor"/><rect x="4" y="6" width="16" height="13" rx="5"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><path d="M9.5 16h5"/></svg>';
+export const BOT_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8v3"/><circle cx="12" cy="2.4" r=".8" fill="currentColor" stroke="none"/><rect x="3.5" y="5.8" width="17" height="15" rx="5"/><g id="b" stroke-width="1.5"><path d="M8 9.2v7.4"/><circle cx="9.9" cy="14.2" r="1.9"/></g><use href="#b" x="6"/></svg>';
 
 /** Roboterkopf mit Sprechblase – ersetzt Text wie „Bestellbot meldet:“. mood: 'ok' | 'warn' (Farbe des Kopfs). */
 export function botSay(text, mood = '') {
