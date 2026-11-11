@@ -307,7 +307,7 @@ input[type="checkbox"] { width: auto; flex: none; }
 /* Status-Leiste unter dem Kopf (neben der Sidebar): markant, volle Breite */
 .statusbar:empty { display: none; }
 .status-lines:empty { display: none; }
-.status-lines { display: grid; }
+.status-lines { display: grid; gap: 3px; }
 .status-lines .banner { border: 0; border-radius: 0; padding: 10px 16px; font-size: 16px; font-weight: 700; text-align: center; }
 .status-lines .banner.warn { background: var(--warn); color: var(--on-warn); }
 .status-lines .banner.ok { background: var(--ok); color: var(--on-ok); }

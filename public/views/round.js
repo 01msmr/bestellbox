@@ -313,15 +313,17 @@ export function roundView(id) {
 
   function renderBanners() {
     const b = [];
-    if (d.ready.total === 0) {
+    if (d.delivered_at) {
+      b.push(h('div', { class: 'banner ok' }, `✓ ${t('Geliefert nach {n} min', { n: Math.max(1, Math.round((d.delivered_at - d.ordered_at) / 60000)) })}`));
+    } else if (d.ordered_at) {
+      b.push(h('div', { class: 'banner ok' }, `✓ ${t('Bestellt um {time}', { time: fmtClock(d.ordered_at) })}`));
+    } else if (d.ready.total === 0) {
       // noch niemand dabei: kein Banner
     } else if (d.ready.not_ready.length) {
       b.push(h('div', { class: 'banner warn' }, t('Noch nicht alle ready ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
     } else {
       b.push(h('div', { class: 'banner ok' }, t('✓ Alle ready ({total}/{total}) – es kann bestellt werden.', { total: d.ready.total })));
     }
-    if (d.ordered_at) b.push(h('div', { class: 'banner ok' }, `✓ ${t('Bestellt um {time}', { time: fmtClock(d.ordered_at) })}`));
-    if (d.ordered_at && d.delivered_at) b.push(h('div', { class: 'banner ok' }, `✓ ${t('Geliefert nach {n} min', { n: Math.max(1, Math.round((d.delivered_at - d.ordered_at) / 60000)) })}`));
     if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('Bestellung unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
     for (const u of d.pending) {
       b.unshift(h('div', { class: 'banner bad row between' },
