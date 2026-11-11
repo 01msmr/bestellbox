@@ -26,11 +26,6 @@
   --bad-text: light-dark(#b3261e, #ee6b6b);
 
   --radius: 8px;
-  --logo-bg: #7fd8b0;
-  --logo-accent: #ffb88c;
-  --logo-ink: #2b3a55;
-  --logo-edge: transparent;
-
   /* Getönte Flächen aus der Akzentfarbe (gedämpft/pastell) */
   --surface: color-mix(in srgb, var(--accent) 8%, var(--bg));
   --line: color-mix(in srgb, var(--accent) 16%, var(--bg));
@@ -39,8 +34,6 @@
 }
 :root[data-theme="ozean"] {
   --bg: light-dark(#eef5fd, #0a2a4f);
-  --logo-bg: #7cc4f4;
-  --logo-accent: #ffd27a;
   --accent: light-dark(#1f5fa6, #4a8fd9);
   --on-accent: #ffffff;
 }
@@ -53,13 +46,11 @@
   --bg: light-dark(#fff3ec, #3a1608);
   --accent: light-dark(#d9480f, #ff8a4c);
   --on-accent: light-dark(#ffffff, #2a0d00);
-  --logo-bg: #ff9a5c; --logo-accent: #fff1b8; --logo-ink: #3b1405;
 }
 :root[data-theme="mais"] {
   --bg: light-dark(#fffcee, #2d2a1c);
   --accent: light-dark(#f2c200, #ffd23f);
   --on-accent: #ffffff;
-  --logo-bg: #ffd23f; --logo-accent: #ff9f43; --logo-ink: #3b2f00;
 }
 
 * { box-sizing: border-box; }
@@ -69,8 +60,9 @@ a { color: var(--accent); text-underline-offset: 2px; }
 /* Kopf: Titel mittig, Einstellungen rechts als direkte Pills (kein Overlay) */
 .top { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px 14px; padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
 .top a { color: var(--fg); text-decoration: none; }
-.brand { grid-column: 2; display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: -.4px; font-size: 30px; line-height: 1; }
+.brand { grid-column: 2; display: flex; align-items: center; gap: 4px; font-weight: 700; letter-spacing: -.4px; font-size: 30px; line-height: 1; }
 .brand svg { flex: none; }
+.brand .wordmark { height: 50px; width: auto; overflow: visible; }
 .tools { grid-column: 3; justify-self: end; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .chip { border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 14px; cursor: pointer; }
 .chip:hover { background: var(--wash); }
@@ -283,8 +275,6 @@ button.btn.ready { margin-left: 0; padding: 11px 26px; font-size: 17px; box-shad
 .page { min-width: 0; }
 
 /* Logo je Theme: S/W = schwarze Kachel mit weißen Zeichen, im Dunkelmodus invertiert (Unterstrich bleibt); Grün = Minze */
-:root[data-theme="mono"] { --logo-bg: light-dark(#0b0b0d, #f2f2f5); --logo-ink: light-dark(#ffffff, #0b0b0d); }
-:root[data-theme="gruen"] { --logo-bg: #7fd8b0; --logo-accent: #ffb88c; --logo-ink: #2b3a55; }
 
 /* S/W im Dunkelmodus: Grund auf Tonhöhe der Farb-Themes angehoben (Schwarz + Weiß), Schrift etwas gedämpfter */
 :root[data-theme="mono"] {
@@ -338,3 +328,5 @@ input[type="checkbox"] { width: auto; flex: none; }
 .price-hint strong { color: var(--fg); }
 
 .add-card { padding-bottom: 6px; }
+
+

@@ -1,5 +1,5 @@
 {
-  "name": "bestellbox",
+  "name": "dinedock",
   "version": "0.1.0",
   "description": "Gemeinsame Essensbestellung für die Toolbox: Bestellungen, Sammelbestellung, fertig/bezahlt-Status, Live-Updates.",
   "type": "module",

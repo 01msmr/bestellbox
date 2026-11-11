@@ -1,4 +1,4 @@
-# bestellbox
+# dinedock (bisher bestellbox)
 
 Gemeinsame Essensbestellung für die Toolbox Bodensee. Eine Person startet eine **Bestellung** bei einem Restaurant,
 alle tragen Artikel ein, markieren sich als **ready** und später als **bezahlt**. Alle sehen live denselben Stand.
