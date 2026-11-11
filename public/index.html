@@ -9,47 +9,46 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="#/">bestellbox</a>
-    <nav>
-      <a href="#/" data-nav="orders" data-i18n="Bestellungen">Bestellungen</a>
-      <a href="#/stats" data-nav="stats" data-i18n="Statistik">Statistik</a>
-    </nav>
-    <button id="who" class="chip" type="button" data-i18n-title="Username ändern"></button>
-    <details id="look" class="look">
-      <summary class="chip" data-i18n-title="Darstellung"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="display:block"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></summary>
-      <div class="look-panel">
-        <div>
-          <h4 data-i18n="Modus">Modus</h4>
-          <div class="seg">
-            <button type="button" data-mode="auto">Auto</button>
-            <button type="button" data-mode="light" data-i18n="Hell">Hell</button>
-            <button type="button" data-mode="dark" data-i18n="Dunkel">Dunkel</button>
-          </div>
-        </div>
-        <div>
-          <h4 data-i18n="Sprache">Sprache</h4>
-          <div class="seg">
-            <button type="button" data-lang="auto">Auto</button>
-            <button type="button" data-lang="de">DE</button>
-            <button type="button" data-lang="en">EN</button>
-          </div>
-        </div>
-        <div>
-          <h4 data-i18n="Farbe">Farbe</h4>
-          <div class="swatches">
-            <button type="button" class="swatch" data-theme="mono"><i></i><span data-i18n="S/W">S/W</span></button>
-            <button type="button" class="swatch" data-theme="ozean"><i></i>Ozean</button>
-            <button type="button" class="swatch" data-theme="beere"><i></i><span data-i18n="Beere">Beere</span></button>
-          </div>
-        </div>
-      </div>
-    </details>
-  </header>
   <div class="layout">
     <aside id="side"></aside>
-    <main id="app"></main>
+    <div class="page">
+    <header class="top">
+      <button id="menu" class="menu-btn" type="button" aria-expanded="false" aria-controls="side" data-i18n-title="Menü"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <a class="brand" href="#/" data-i18n-title="Start">
+        <svg viewBox="0 0 48 48" width="44" height="44" role="img" aria-hidden="true">
+          <rect x="2" y="2" width="44" height="44" rx="12" fill="var(--logo-bg)" stroke="var(--logo-edge)" stroke-width="1.5"/>
+          <text x="13" y="37" font-size="38" font-weight="700" font-family="system-ui,-apple-system,Segoe UI,sans-serif" fill="var(--logo-ink)">b</text>
+          <path d="M12 42 H36" stroke="var(--logo-accent)" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M-7 0 L-2 5 L8 -6" transform="translate(37 14) scale(.7)" fill="none" stroke="var(--logo-ink)" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>bestellbox</span>
+      </a>
+      <div id="look" class="tools">
+        <button id="who" class="chip" type="button" data-i18n-title="Username ändern"></button>
+        <div class="seg" role="group" data-cycle="mode" data-i18n-title="Modus">
+          <button type="button" data-mode="auto" title="Auto" aria-label="Auto"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></button>
+          <button type="button" data-mode="light" data-i18n-title="Hell"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3 3l1 1M12 12l1 1M13 3l-1 1M4 12l-1 1"/></svg></button>
+          <button type="button" data-mode="dark" data-i18n-title="Dunkel"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg></button>
+        </div>
+        <div class="seg" role="group" data-cycle="lang" data-i18n-title="Sprache">
+          <button type="button" data-lang="auto" title="Auto" aria-label="Auto"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13M8 1.5c2 2 2 11 0 13M8 1.5c-2 2-2 11 0 13"/></svg></button>
+          <button type="button" data-lang="de" title="Deutsch" aria-label="Deutsch">DE</button>
+          <button type="button" data-lang="en" title="English" aria-label="English">EN</button>
+        </div>
+        <div class="seg" role="group" data-cycle="theme" data-i18n-title="Farbe">
+          <button type="button" data-theme="mono" data-i18n-title="S/W"><i class="dot" style="--sw:linear-gradient(90deg,#121214 50%,#fff 50%)"></i></button>
+          <button type="button" data-theme="ozean" title="Ozean" aria-label="Ozean"><i class="dot" style="--sw:#1f5fa6"></i></button>
+          <button type="button" data-theme="gruen" data-i18n-title="Grün"><i class="dot" style="--sw:#23794d"></i></button>
+        <button type="button" data-theme="orange" data-i18n-title="Orange"><i class="dot" style="--sw:#e8590c"></i></button>
+        <button type="button" data-theme="mais" data-i18n-title="Mais"><i class="dot" style="--sw:#f2c230"></i></button>
+        </div>
+      </div>
+    </header>
+      <div id="statusbar" class="statusbar"></div>
+      <main id="app"></main>
+    </div>
   </div>
+  <div id="scrim"></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script type="module" src="/i18n.js"></script>
   <script type="module" src="/app.js"></script>

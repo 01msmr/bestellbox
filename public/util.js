@@ -11,7 +11,13 @@ export const nav = { current: null };
 
 const eurFmt = new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' });
 export const eur = (c) => eurFmt.format((c ?? 0) / 100);
-export const fmtDate = (ms) => new Date(ms).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
+// „Sa., 7. 11. 2026“ (ohne Jahr: „Sa., 7. 11.“)
+export const fmtDay = (ms, year = true) =>
+  new Date(ms).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'numeric', ...(year ? { year: 'numeric' } : {}) }).replace(/\.(?=\d)/g, '. ');
+export const fmtDate = (ms) => `${fmtDay(ms)}, ${new Date(ms).toLocaleTimeString(locale, { timeStyle: 'short' })}`;
+export const fmtClock = (ms) => new Date(ms).toLocaleTimeString(locale, { timeStyle: 'short' });
+// Heute: nur Uhrzeit; sonst Datum mit Wochentag + Uhrzeit (mehrere Bestellungen eines Restaurants pro Tag unterscheidbar)
+export const fmtWhen = (ms) => (new Date(ms).toDateString() === new Date().toDateString() ? fmtClock(ms) : `${fmtDay(ms, false)}, ${fmtClock(ms)}`);
 export const lc = (s) => String(s ?? '').toLocaleLowerCase('de');
 
 export function h(tag, props, ...kids) {
@@ -40,7 +46,17 @@ export function toast(msg) {
 }
 
 // ---------- State & API ----------
-export let me = localStorage.getItem('bb_user') ?? '';
+// Gast = Name nur für diesen Tab (sessionStorage); der gespeicherte Name des Rechners bleibt unberührt
+const guestStored = () => {
+  try {
+    return sessionStorage.getItem('bb_guest') ?? '';
+  } catch {
+    return '';
+  }
+};
+export const homeName = () => localStorage.getItem('bb_user') ?? '';
+export let isGuest = !!guestStored();
+export let me = guestStored() || homeName();
 
 export async function api(method, path, body) {
   const res = await fetch('/api' + path, {
@@ -63,10 +79,16 @@ export async function act(fn) {
   }
 }
 
-export function setMe(name) {
+export function setMe(name, { guest = false } = {}) {
   me = name.trim().slice(0, LIMITS.userName);
-  localStorage.setItem('bb_user', me);
-  whoBtn.textContent = me ? `👤 ${me}` : t('Name wählen');
+  isGuest = guest;
+  if (guest) sessionStorage.setItem('bb_guest', me);
+  else {
+    sessionStorage.removeItem('bb_guest');
+    localStorage.setItem('bb_user', me);
+  }
+  whoBtn.textContent = me ? `${me}${guest ? ` (${t('dieser Tab')})` : ''}` : t('Name wählen');
+  whoBtn.classList.toggle('guest', guest);
 }
 
 // ---------- Helpers ----------
@@ -93,18 +115,11 @@ export function contactLinks(r) {
   return h(
     'div',
     { class: 'row' },
-    tel ? h('a', { href: tel }, '📞 ' + r.phone) : h('span', { class: 'muted' }, t('keine Telefonnummer')),
-    web ? h('a', { href: web, target: '_blank', rel: 'noopener noreferrer' }, '🌐 ' + r.url.replace(/^https?:\/\//i, '')) : null
+    tel ? h('a', { href: tel }, '' + r.phone) : h('span', { class: 'muted' }, t('keine Telefonnummer')),
+    web ? h('a', { href: web, target: '_blank', rel: 'noopener noreferrer' }, '' + r.url.replace(/^https?:\/\//i, '')) : null
   );
 }
-export function fmtRemaining(ms) {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  const hh = Math.floor(s / 3600);
-  const mm = Math.floor((s % 3600) / 60);
-  const ss = s % 60;
-  const p = (n) => String(n).padStart(2, '0');
-  return hh ? `${hh}:${p(mm)}:${p(ss)}` : `${p(mm)}:${p(ss)}`;
-}
+export { fmtRemaining } from '/format.js';
 export function fold(s) {
   return String(s ?? '')
     .toLocaleLowerCase('de')

@@ -79,9 +79,14 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
     }
     if (method === 'GET' && p === '/api/me') return send(res, 200, { user, is_admin: user ? logic.isAdmin(user) : false });
     if (method === 'GET' && p === '/api/me/paypal') return send(res, 200, { paypal: logic.myPaypal(user) });
+    if (method === 'GET' && p === '/api/export') {
+      if (!user || !logic.isAdmin(user)) return send(res, 403, { error: 'Nur für Admins' });
+      return send(res, 200, logic.exportRows());
+    }
+    if (method === 'GET' && p === '/api/users') return send(res, 200, logic.users());
     if (method === 'GET' && p === '/api/restaurants') return send(res, 200, logic.restaurants());
     if (method === 'GET' && p === '/api/stats') return send(res, 200, logic.stats(url.searchParams.get('scope') === 'last30' ? 'last30' : 'all'));
-    if (method === 'GET' && p === '/api/rounds') return send(res, 200, logic.listRounds(user));
+    if (method === 'GET' && p === '/api/rounds') return send(res, 200, logic.listRounds(user, url.searchParams.has('all') ? -1 : undefined));
     if (method === 'POST' && p === '/api/rounds') {
       const id = logic.createRound(user, await readJson(req));
       emit(id);

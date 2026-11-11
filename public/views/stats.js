@@ -25,7 +25,24 @@ export function statsView() {
       )
     );
   }
-  app.replaceChildren(h('h2', { style: 'margin:0' }, t('Statistik')), scopeBtns, body);
+  // Export aller Artikelzeilen als JSON-Datei (nur Admins)
+  const exportBtn = h(
+    'button',
+    {
+      class: 'btn small ghost hidden',
+      type: 'button',
+      onclick: async () => {
+        const rows = await act(() => api('GET', '/export'));
+        if (!rows) return;
+        const a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' })), download: `bestellbox-export-${new Date().toISOString().slice(0, 10)}.json` });
+        a.click();
+        URL.revokeObjectURL(a.href);
+      },
+    },
+    t('Export (JSON)')
+  );
+  api('GET', '/me').then((m) => exportBtn.classList.toggle('hidden', !m.is_admin)).catch(() => {});
+  app.replaceChildren(h('div', { class: 'row between' }, h('h2', { style: 'margin:0' }, t('Statistik')), exportBtn), scopeBtns, body);
 
   return {
     async refresh() {
@@ -51,12 +68,12 @@ export function statsView() {
           h(
             'table',
             null,
-            h('thead', null, h('tr', null, h('th', null, 'Restaurant'), h('th', { class: 'num' }, t('Bestellungen')), h('th', { class: 'num' }, t('Artikel')), h('th', null, t('Beliebtestes Gericht')))),
+            h('thead', null, h('tr', null, h('th', null, 'Restaurant'), h('th', { class: 'num' }, t('Bestellungen')), h('th', { class: 'num' }, t('Artikel')), h('th', null, t('Beliebtestes Gericht')), h('th', { class: 'num' }, t('Ø Lieferzeit')))),
             h(
               'tbody',
               null,
               s.restaurants.map((r) =>
-                h('tr', null, h('td', null, r.name), h('td', { class: 'num' }, String(r.rounds)), h('td', { class: 'num' }, String(r.items)), h('td', null, r.top_dish ? `${r.top_dish} (${r.top_dish_qty}×)` : '—'))
+                h('tr', null, h('td', null, r.name), h('td', { class: 'num' }, String(r.rounds)), h('td', { class: 'num' }, String(r.items)), h('td', null, r.top_dish ? `${r.top_dish} (${r.top_dish_qty}×)` : '—'), h('td', { class: 'num' }, r.delivery_minutes == null ? '—' : `${r.delivery_minutes} min`))
               )
             )
           )

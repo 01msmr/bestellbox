@@ -1,7 +1,7 @@
 # bestellbox
 
 Gemeinsame Essensbestellung für die Toolbox Bodensee. Eine Person startet eine **Bestellung** bei einem Restaurant,
-alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt**. Alle sehen live denselben Stand.
+alle tragen Artikel ein, markieren sich als **ready** und später als **bezahlt**. Alle sehen live denselben Stand.
 
 ## Funktionen
 
@@ -13,11 +13,12 @@ alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt
   Der **Preis wird nie vorausgefüllt**; ein Chip „zuletzt X € (ungeprüft)“ muss aktiv übernommen werden.
   Preisabweichungen werden beim Eintragen und im Bestell-Tab markiert. Die Verantwortung für den Preis liegt beim User.
 - **Drei Tabs:** *Nach Usern*, *Meine*, *Bestellen* (gebündelte Sammelbestellung zum Telefonieren/Kopieren).
-- **Status:** `fertig` und `bezahlt` sind zwei unabhängige Häkchen pro User, für alle sichtbar.
-- **Warnbanner**, solange nicht alle fertig sind.
-- **Frist** (Standard 20 min, beim Anlegen einstellbar, `+5 min`). Nach Ablauf ist die Runde gesperrt;
+- **Status:** `ready` und `bezahlt` sind zwei unabhängige Häkchen pro User, für alle sichtbar. Jeder User muss seine Artikel insgesamt als `ready` setzen; jede Änderung an den eigenen Artikeln setzt ihn wieder auf „nicht ready“. Solange ein User nicht ready ist, ist auch die Gesamtbestellung nicht ready (Warnbanner).
+- **Geschlossen:** Artikel von Usern, die nicht „ready“ sind, bleiben sichtbar, zählen aber nicht (Sammelbestellung, Summen, Schulden); „Wieder öffnen“ bringt sie zurück.
+- **Warnbanner**, solange nicht alle ready sind.
+- **Frist** (Standard 20 min, beim Anlegen einstellbar, `+5 min`). Nach Ablauf ist die Runde geschlossen;
   Ersteller, Besteller und Admins können sie wieder öffnen.
-- **Schließen, wenn alle fertig:** Option im Zeitfeld (Ersteller/Besteller/Admins); sperrt automatisch, sobald alle User mit Artikeln „fertig“ sind. Solange die Option aktiv ist, kommen neue User nur nach Freigabe hinein: ihr Versuch erscheint als Hinweis bei Ersteller/Besteller/Admins (Freigeben / Ablehnen), bestehende User sind nicht betroffen.
+- **Schließen, wenn alle ready:** Option im Zeitfeld (Ersteller/Besteller/Admins); schließt automatisch, sobald alle User mit Artikeln „ready“ sind. Solange die Option aktiv ist, kommen neue User nur nach Freigabe hinein: ihr Versuch erscheint als Hinweis bei Ersteller/Besteller/Admins (Freigeben / Ablehnen), bestehende User sind nicht betroffen.
 - **Bestellt von** + PayPal-Adresse/Link und **Lieferkosten** (anteilig nach Artikelsumme verteilt).
 - **Bezahlen:** Block mit PayPal-Adresse des Bestellers (kopierbar) und, bei paypal.me-Adressen, einem Link mit dem
   eigenen Betrag. PayPal-Adresse (je Besteller) und Lieferkosten (je Restaurant) werden gemerkt und bei der nächsten
@@ -29,7 +30,8 @@ alle tragen Artikel ein, markieren sich als **fertig** und später als **bezahlt
 - **Offene Beträge:** eine Zeile pro User. Runden mit offenen Beträgen erscheinen separat als *unbezahlt*.
 - **Statistik** (letzte 30 / alle): meistbestelltes Restaurant, beliebtestes Gericht je Restaurant,
   Ø Artikelpreis und Ø Bestellsumme. Es gibt bewusst keine Auswertung nach einzelnen Usern.
-- **Darstellung:** Hell/Dunkel automatisch nach System, manuell überschreibbar; Themen S/W, Ozean, Beere.
+- **Export:** Admins (`ADMINS` in `compose.yaml`) laden in der Statistik alle Artikelzeilen als JSON-Datei (`/api/export`).
+- **Darstellung:** Hell/Dunkel automatisch nach System, manuell überschreibbar; Themen S/W, Ozean, Grün, Orange, Mais.
 - **Sprache:** Deutsch/Englisch, automatisch nach Browsersprache, manuell umschaltbar (◐-Panel).
   Neue Texte: deutscher Text ist der Schlüssel, Englisch steht in `public/i18n.js`.
 

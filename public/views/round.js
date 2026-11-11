@@ -1,32 +1,41 @@
 // Bestellseite: Frist, Banner, Bezahlen, Tabs (Nach Usern / Meine / Bestellen), offene Beträge.
-import { t } from '/i18n.js';
+import { t, lang } from '/i18n.js';
 import { LIMITS, DEFAULTS, LISTS, TIMING } from '/config.js';
-import { app, eur, fmtDate, lc, h, toast, api, act, me, telHref, payHref, contactLinks, fmtRemaining, fold, parseMoney, nav } from '/util.js';
+import { isCurrentRound } from '/group.js';
+import { genitive } from '/format.js';
+import { app, eur, fmtDate, fmtWhen, fmtClock, lc, h, toast, api, act, me, telHref, payHref, contactLinks, fmtRemaining, fold, parseMoney, nav } from '/util.js';
 
 export function roundView(id) {
   let d = null;
   let skew = 0;
   let expiredRefreshed = false;
   let catalogLoaded = false;
-  let tab = sessionStorage.getItem('bb_tab') || 'users';
+  let tab = sessionStorage.getItem('bb_tab') || 'mine';
 
   const head = h('section', { class: 'card' });
   const timerNum = h('div', { class: 'timer' }, '--:--');
   const timerLabel = h('div', { class: 'muted' });
   const timerBtns = h('div', { class: 'row' });
   const timerCard = h('section', { class: 'card row between' }, h('div', null, timerLabel, timerNum), timerBtns);
-  const banners = h('div', { style: 'display:grid;gap:8px' });
+  // Status-Zeilen (nicht ready, unbezahlt, Freigaben) als markante Leiste unter dem Kopf
+  const banners = h('div', { class: 'status-lines' });
+  document.getElementById('statusbar').replaceChildren(banners);
   const tabsEl = h('div', { class: 'tabs', role: 'tablist' });
-  const usersPane = h('div', { style: 'display:grid;gap:10px' });
+  const usersPane = h('div', { class: 'users-pane' });
   const minePane = h('div', { style: 'display:grid;gap:10px' });
   const orderPane = h('div', { class: 'card' });
-  const debtsCard = h('section', { class: 'card' });
+  const debtsCard = h('section', { class: 'card debts' });
   const payCard = h('section', { class: 'card pay hidden' });
+  const inEta = h('input', { type: 'number', min: 1, max: LIMITS.etaMaxMinutes, value: DEFAULTS.etaMinutes, inputmode: 'numeric', style: 'width:84px' });
+  const etaText = h('div', { style: 'font-weight:600' });
+  const orderCard = h('section', { class: 'card order-card hidden' });
+  let wasOrdered = null;
+  let etaPrefilled = false;
 
   // Persistente Eingabezeile (wird bei Live-Updates nicht neu gebaut)
   const inArticle = h('input', { placeholder: t('Artikel'), maxlength: LIMITS.article, required: true, autocomplete: 'off' });
   const inVariant = h('input', { placeholder: t('z. B. 26 cm, Fladenbrot, scharf'), maxlength: LIMITS.variant, autocomplete: 'off' });
-  const inPrice = h('input', { placeholder: t('Preis €'), inputmode: 'decimal', required: true });
+  const inPrice = h('input', { placeholder: '0,00', inputmode: 'decimal', required: true });
   const inQty = h('input', { type: 'number', min: LIMITS.qtyMin, max: LIMITS.qtyMax, value: 1 });
   const addBtn = h('button', { class: 'btn', type: 'submit' }, t('Hinzufügen'));
   const sugBox = h('div', { class: 'assist' });
@@ -63,10 +72,11 @@ export function roundView(id) {
   inArticle.addEventListener('input', updateAssist);
   inVariant.addEventListener('input', updateAssist);
 
+  const col = (cls, ...kids) => h('div', { class: 'c-' + cls }, ...kids);
   const addForm = h(
     'form',
     {
-      class: 'card',
+      class: 'card item-card add-card',
       onsubmit: async (e) => {
         e.preventDefault();
         const price = parseMoney(inPrice.value);
@@ -85,24 +95,20 @@ export function roundView(id) {
         }
       },
     },
-    h('h3', null, t('Artikel eintragen')),
-    h('div', { style: 'display:grid;gap:10px' },
-      h('label', null, t('Artikel'), inArticle),
-      h('label', null, t('Variante (optional)'), inVariant),
-      sugBox,
-      h('div', { class: 'grid2', style: 'grid-template-columns:2fr 1fr' }, h('label', null, t('Preis'), inPrice), h('label', null, t('Menge'), inQty)),
-      h('div', { class: 'notice' }, h('strong', null, t('⚠ Preis selbst prüfen. ')), t('Du bist für deine Angaben verantwortlich. Vorgeschlagene Preise stammen aus früheren Bestellungen und können veraltet oder falsch sein.'))
-    ),
-    h('div', { style: 'margin-top:10px' }, addBtn)
+    h('h3', null, t('+ Artikel')),
+    h('div', { class: 'item-row item-labels muted' }, col('qty', t('Menge')), col('art', t('Artikel')), col('var', t('Variante (optional)')), col('price', t('Preis')), col('act')),
+    h('div', { class: 'item-row' }, col('qty', inQty), col('art', inArticle), col('var', inVariant), col('price', h('div', { class: 'price-in' }, inPrice, h('span', null, '€'))), col('act', addBtn)),
+    sugBox,
+    h('div', { class: 'price-hint' }, h('strong', null, t('Preise selbst prüfen. ')), t('Vorgeschlagene Preise stammen aus früheren Bestellungen und können veraltet sein.'))
   );
-  const mineList = h('div', { class: 'card' });
+  const mineList = h('div', { class: 'card item-card mine-card' });
   minePane.append(addForm, mineList);
 
   const panes = { users: usersPane, mine: minePane, order: orderPane };
   const tabDefs = [
-    ['users', t('Nach Usern')],
-    ['mine', t('Meine')],
-    ['order', t('Bestellen')],
+    ['mine', lang === 'de' ? `${genitive(me, 'de')} Artikel` : `${genitive(me, 'en')} items`],
+    ['users', t('Alle')],
+    ['order', t('Sammelbestellung')],
   ];
   function showTab(t) {
     tab = t;
@@ -116,7 +122,7 @@ export function roundView(id) {
   app.classList.add('wide');
   head.classList.add('round-head');
   app.replaceChildren(
-    h('div', { class: 'round-grid' }, head, h('div', { class: 'round-side' }, timerCard, banners, payCard), h('div', { class: 'round-main' }, tabsEl, usersPane, minePane, orderPane, debtsCard))
+    h('div', { class: 'round-grid' }, head, h('div', { class: 'round-main' }, tabsEl, usersPane, minePane, orderPane, debtsCard))
   );
   showTab(tab);
 
@@ -127,69 +133,175 @@ export function roundView(id) {
 
   function flagBadge(u, flag) {
     const on = u[flag];
-    const label = flag === 'done' ? (on ? t('✓ fertig') : t('in Arbeit')) : on ? t('✓ bezahlt') : t('nicht bezahlt');
-    const cls = on ? 'on' : flag === 'done' ? 'mid' : 'off';
-    const editable = lc(u.user) === lc(me) || d.viewer.can_manage;
-    if (!editable) return h('span', { class: `badge ${cls}` }, label);
+    const label = flag === 'done' ? (on ? t('✓ ready') : t('unready')) : on ? t('✓ bezahlt') : t('nicht bezahlt');
+    const cls = on ? 'on' : flag === 'done' ? 'pale' : 'off';
+    const editable = lc(u.user) === lc(me) || (flag === 'paid' && d.viewer.can_manage);
+    if (!editable || flag === 'done') return h('span', { class: `badge ${cls}` }, label); // ready wird nur über den Button gesetzt
     return h('button', { class: `badge ${cls}`, title: t('Umschalten'), onclick: () => toggle(flag, { user: u.user, value: !on }) }, label);
   }
 
-  function renderHead() {
-    const editBuyer = h('input', { value: d.buyer, maxlength: LIMITS.userName });
-    const editPaypal = h('input', { value: d.paypal, maxlength: LIMITS.paypal });
-    const editFee = h('input', { value: (d.delivery_fee_cents / 100).toFixed(2).replace('.', ','), inputmode: 'decimal' });
-    head.replaceChildren(
-      ...[
-      h('div', { class: 'row between' }, h('h2', { style: 'margin:0' }, d.restaurant.name), h('a', { href: '#/' }, t('← Alle Bestellungen'))),
-      contactLinks(d.restaurant),
-      h(
-        'div',
-        { class: 'muted', style: 'margin-top:6px' },
-        t('Gestartet {date} von {creator} · bestellt von ', { date: fmtDate(d.created_at), creator: d.creator }),
-        h('strong', null, d.buyer),
-        t(' · Lieferkosten: {fee}', { fee: eur(d.delivery_fee_cents) })
-      ),
-      d.viewer.can_manage
-        ? h(
-            'details',
-            { style: 'margin-top:8px' },
-            h('summary', null, t('Bestellung bearbeiten')),
-            h(
-              'form',
-              {
-                class: 'grid2',
-                style: 'margin-top:8px',
-                onsubmit: async (e) => {
-                  e.preventDefault();
-                  await act(() => api('PATCH', `/rounds/${id}`, { buyer: editBuyer.value, paypal: editPaypal.value, delivery_fee: parseMoney(editFee.value) }));
-                  nav.current.refresh();
-                },
-              },
-              h('label', null, t('Bestellt von'), editBuyer),
-              h('label', null, 'PayPal', editPaypal),
-              h('label', null, t('Lieferkosten (€)'), editFee),
-              h('div', { class: 'row', style: 'align-items:end' }, h('button', { class: 'btn small', type: 'submit' }, t('Speichern')))
-            )
-          )
-        : null
-      ].filter(Boolean)
+  // Dauerhaftes Formular (Besteller, PayPal, Lieferkosten): wird bei Live-Updates nicht neu gebaut; ungespeicherte Eingaben bleiben
+  const eBuyer = h('input', { maxlength: LIMITS.userName });
+  const ePaypal = h('input', { maxlength: LIMITS.paypal });
+  const eFee = h('input', { inputmode: 'decimal' });
+  const editInputs = [eBuyer, ePaypal, eFee];
+  const saveBtn = h('button', { class: 'btn small', type: 'submit', disabled: true }, t('Speichern'));
+  const editFill = h('i');
+  const editBar = h('div', { class: 'edit-bar hidden' }, h('span', null, t('Nicht gespeichert – wird zurückgenommen')), h('div', { class: 'edit-track' }, editFill));
+  let saved = ['', '', ''];
+  let deadline = 0;
+  let editTick = null;
+  const stopEdit = () => {
+    clearInterval(editTick);
+    editTick = null;
+    editBar.classList.add('hidden');
+  };
+  // Speichern nur bei Änderung; ohne Bestätigung nach editRevertMs wird zurückgesetzt (Balken in den letzten editWarnMs)
+  function tickEdit() {
+    const left = deadline - Date.now();
+    if (left <= 0) {
+      editInputs.forEach((i, n) => (i.value = saved[n]));
+      syncEdit(false);
+      toast(t('Änderung zurückgenommen'));
+      return;
+    }
+    editBar.classList.toggle('hidden', left > TIMING.editWarnMs);
+    editFill.style.width = `${Math.min(100, (left / TIMING.editWarnMs) * 100)}%`;
+  }
+  function syncEdit(restart) {
+    editInputs.forEach((i, n) => (i.dataset.dirty = i.value !== saved[n] ? '1' : ''));
+    const dirty = editInputs.some((i) => i.dataset.dirty);
+    saveBtn.disabled = !dirty;
+    if (!dirty) return stopEdit();
+    if (restart) deadline = Date.now() + TIMING.editRevertMs;
+    editTick ??= setInterval(tickEdit, TIMING.barTickMs);
+    tickEdit();
+  }
+  for (const i of editInputs) i.addEventListener('input', () => syncEdit(true));
+  const headPick = h('nav', { class: 'head-pick' });
+  const headTop = h('div');
+  const headMeta = h('div', { class: 'muted', style: 'margin-top:6px' });
+  const headForm = h(
+    'form',
+    {
+      class: 'grid2',
+      style: 'margin-top:10px',
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const ok = await act(() => api('PATCH', `/rounds/${id}`, { buyer: eBuyer.value, paypal: ePaypal.value, delivery_fee: parseMoney(eFee.value) }));
+        if (ok) {
+          saved = editInputs.map((i) => i.value);
+          syncEdit(false);
+        }
+        nav.current.refresh();
+      },
+    },
+    h('label', null, t('Bestellt von'), eBuyer),
+    h('label', null, 'PayPal', ePaypal),
+    h('label', null, t('Lieferkosten (€)'), eFee),
+    editBar,
+    h('div', { class: 'form-actions' }, saveBtn)
+  );
+  head.append(headPick, h('div', { class: 'head-main' }, headTop, headMeta, headForm), h('div', { class: 'head-side' }, timerCard, orderCard, payCard));
+
+  // Wechsel zwischen den heutigen/offenen Bestellungen (nur sichtbar, wenn es mehrere gibt)
+  function renderPick(list) {
+    const cur = (list ?? []).filter((x) => isCurrentRound(x, Date.now()));
+    // Stack nur bei mehreren Bestellungen heute (bei einer steht sie direkt in der Sidebar)
+    const show = cur.length > 1;
+    head.classList.toggle('has-pick', show);
+    headPick.replaceChildren(
+      ...(show
+        ? cur.map((x) => h('a', { class: 'pick-item' + (x.id === id ? ' active' : ''), href: `#/r/${x.id}` }, h('strong', null, x.restaurant), h('span', { class: 'muted' }, `${fmtWhen(x.created_at)} · ${x.creator}`)))
+        : [])
     );
   }
 
+  function renderHead() {
+    headTop.replaceChildren(
+      h('h2', { style: 'margin:0' }, d.restaurant.name, h('span', { class: 'muted', style: 'font-weight:400;margin-left:8px' }, fmtWhen(d.created_at))),
+      contactLinks(d.restaurant),
+      ...(d.restaurant.address ? [h('div', { class: 'muted' }, d.restaurant.address)] : [])
+    );
+    const manage = d.viewer.can_manage;
+    headMeta.replaceChildren(
+      ...(manage
+        ? [t('Gestartet {date} von {creator}', { date: fmtDate(d.created_at), creator: d.creator })]
+        : [
+            t('Gestartet {date} von {creator} · bestellt von ', { date: fmtDate(d.created_at), creator: d.creator }),
+            h('strong', null, d.buyer),
+            t(' · Lieferkosten: {fee}', { fee: eur(d.delivery_fee_cents) }),
+          ])
+    );
+    headForm.classList.toggle('hidden', !manage);
+    const vals = [d.buyer, d.paypal, (d.delivery_fee_cents / 100).toFixed(2).replace('.', ',')];
+    saved = vals;
+    editInputs.forEach((i, n) => {
+      if (!i.dataset.dirty) i.value = vals[n];
+    });
+    syncEdit(false);
+  }
+
+  // Bestellt-Meldung und geschätzte Lieferzeit (Ersteller/Besteller/Admins setzen, alle sehen live)
+  function renderOrderStatus() {
+    const manage = d.viewer.can_manage;
+    const ordered = !!d.ordered_at;
+    if (!etaPrefilled) {
+      etaPrefilled = true;
+      if (d.restaurant.delivery_minutes >= 1) inEta.value = d.restaurant.delivery_minutes;
+    }
+    orderCard.classList.toggle('hidden', !ordered && !manage);
+    const patch = (body) => act(() => api('PATCH', `/rounds/${id}`, body)).then(() => nav.current.refresh());
+    const eta = inEta.value === '' ? {} : { eta_minutes: Number(inEta.value) };
+    const kids = [];
+    if (ordered) kids.push(h('div', { class: 'banner ok' }, `✓ ${t('Bestellt um {time}', { time: fmtClock(d.ordered_at) })}`), d.delivered_at ? h('div', { class: 'banner ok' }, `✓ ${t('Geliefert nach {n} min', { n: Math.max(1, Math.round((d.delivered_at - d.ordered_at) / 60000)) })}`) : etaText);
+    if (manage) {
+      kids.push(
+        d.delivered_at ? null : h('label', { class: 'row muted' }, t('Lieferzeit (Minuten, geschätzt)'), inEta, d.restaurant.delivery_count ? h('span', null, t('Ø {n} min bei diesem Restaurant', { n: d.restaurant.delivery_minutes })) : null),
+        h(
+          'div',
+          { class: 'form-actions', style: 'gap:8px' },
+          !ordered && !d.locked ? h('span', { class: 'warn-text' }, t('Erst schließen, dann bestellen')) : null,
+          ordered ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => patch({ ordered: false }) }, t('Bestellt zurücknehmen')) : null,
+          ordered && !d.delivered_at ? h('button', { class: 'btn small', type: 'button', onclick: () => patch({ delivered: true }) }, t('Geliefert')) : null,
+          ordered
+            ? d.delivered_at ? null : h('button', { class: 'btn small', type: 'button', onclick: () => patch(eta) }, t('Lieferzeit aktualisieren'))
+            : h('button', { class: 'btn small', type: 'button', disabled: !d.locked, onclick: () => patch({ ordered: true, ...eta }) }, t('Als bestellt melden'))
+        )
+      );
+    }
+    orderCard.replaceChildren(...kids.filter(Boolean));
+    if (wasOrdered === false && ordered) toast(d.eta_at ? t('✓ Bestellt – Lieferung ca. {time}', { time: fmtClock(d.eta_at) }) : t('✓ Bestellt'));
+    wasOrdered = ordered;
+    updateEta();
+  }
+  function updateEta() {
+    if (!d?.eta_at) {
+      etaText.textContent = '';
+      return;
+    }
+    const left = d.eta_at - (Date.now() + skew);
+    etaText.textContent = `${t('Lieferung ca. {time}', { time: fmtClock(d.eta_at) })} · ${left > 0 ? `${t('noch')} ${fmtRemaining(left)}` : t('sollte da sein')}`;
+  }
+
   function renderTimerControls() {
-    timerLabel.textContent = d.locked ? t('Bestellfrist abgelaufen – Bestellung gesperrt') : t('Bestellfrist');
+    timerLabel.textContent = d.locked ? t('Bestellfrist abgelaufen – Bestellung geschlossen') : t('Bestellfrist');
     const buttons = [];
     if (d.viewer.can_manage) {
-      buttons.push(h('button', { class: 'btn small', onclick: () => timeAction('extend', DEFAULTS.extendMinutes) }, `+${DEFAULTS.extendMinutes} min`));
-      if (!d.locked) buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('lock') }, t('Jetzt sperren')));
-      else buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('extend', DEFAULTS.extendMinutes) }, t('Wieder öffnen')));
+      const ordered = !!d.ordered_at;
+      const reason = ordered ? t('Erst „Bestellt“ zurücknehmen') : d.locked ? t('Zum Verlängern erst wieder öffnen') : null;
+      if (reason) buttons.push(h('span', { class: 'warn-text', style: 'width:100%' }, reason));
+      buttons.push(h('button', { class: 'btn small', disabled: d.locked, onclick: () => timeAction('extend', DEFAULTS.extendMinutes) }, `+${DEFAULTS.extendMinutes} min`));
+      if (!d.locked) buttons.push(h('button', { class: 'btn small ghost', onclick: () => timeAction('lock') }, t('Jetzt schließen')));
+      else buttons.push(h('button', { class: 'btn small ghost', disabled: ordered, onclick: () => timeAction('reopen', DEFAULTS.extendMinutes) }, t('Wieder öffnen')));
     }
     if (d.viewer.can_manage) {
       const cb = h('input', { type: 'checkbox', onchange: () => act(() => api('PATCH', `/rounds/${id}`, { close_when_ready: cb.checked })).then(() => nav.current.refresh()) });
       cb.checked = d.close_when_ready;
-      buttons.push(h('label', { class: 'row muted', style: 'gap:6px;width:100%' }, cb, t('Schließen, wenn alle fertig')));
+      cb.disabled = d.locked;
+      buttons.push(h('label', { class: 'row muted', style: 'gap:6px;width:100%' }, cb, t('Schließen, wenn alle ready')));
     } else if (d.close_when_ready && !d.locked) {
-      buttons.push(h('div', { class: 'muted' }, t('Schließt, sobald alle fertig sind')));
+      buttons.push(h('div', { class: 'muted' }, t('Schließt, sobald alle ready sind')));
     }
     timerBtns.replaceChildren(...buttons);
   }
@@ -202,13 +314,13 @@ export function roundView(id) {
   function renderBanners() {
     const b = [];
     if (d.ready.total === 0) {
-      b.push(h('div', { class: 'banner warn' }, t('Noch keine Artikel – trag deine ein.')));
+      // noch niemand dabei: kein Banner
     } else if (d.ready.not_ready.length) {
-      b.push(h('div', { class: 'banner warn' }, t('⚠ Noch nicht alle fertig ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
+      b.push(h('div', { class: 'banner warn' }, t('Noch nicht alle ready ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
     } else {
-      b.push(h('div', { class: 'banner ok' }, t('✓ Alle fertig ({total}/{total}) – kann bestellt werden', { total: d.ready.total })));
+      b.push(h('div', { class: 'banner ok' }, t('✓ Alle ready ({total}/{total}) – es kann bestellt werden.', { total: d.ready.total })));
     }
-    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('💸 Bestellung unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
+    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('Bestellung unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
     for (const u of d.pending) {
       b.unshift(h('div', { class: 'banner bad row between' },
         h('span', null, t('Neu: {user} möchte mitbestellen', { user: u })),
@@ -236,26 +348,32 @@ export function roundView(id) {
     );
   }
 
+  // „Alle“: ready-User oben; nicht ready deutlich abgesetzt ganz unten (zählen nicht in der Bestellung)
   function renderUsers() {
     if (!d.users.length) {
       usersPane.replaceChildren(h('div', { class: 'card muted' }, t('Noch niemand dabei.')));
       return;
     }
+    const card = (u) =>
+      h(
+        'section',
+        { class: `card user-card ${u.done ? (u.paid || lc(u.user) === lc(d.buyer) ? 'paid' : 'unpaid') : 'unready'}` },
+        h('div', { class: 'row between' }, h('strong', null, u.user + (lc(u.user) === lc(d.buyer) ? t(' (Besteller)') : '')), h('div', { class: 'row' }, flagBadge(u, 'done'), !u.done || lc(u.user) === lc(d.buyer) ? null : flagBadge(u, 'paid'))),
+        u.items.length ? itemsTable(u) : h('div', { class: 'muted' }, t('noch nichts')),
+        u.done
+          ? h(
+              'div',
+              { class: 'row between muted', style: 'margin-top:6px' },
+              h('span', null, `${t('Artikel')} ${eur(u.subtotal_cents)}${u.fee_cents ? ` + ${t('Lieferanteil')} ${eur(u.fee_cents)}` : ''}`),
+              h('strong', { style: 'color:var(--fg)' }, eur(u.total_cents))
+            )
+          : null
+      );
+    const ready = d.users.filter((u) => u.done);
+    const unready = d.users.filter((u) => !u.done);
     usersPane.replaceChildren(
-      ...d.users.map((u) =>
-        h(
-          'section',
-          { class: `card user-card ${u.paid || lc(u.user) === lc(d.buyer) ? 'paid' : 'unpaid'}` },
-          h('div', { class: 'row between' }, h('strong', null, u.user + (lc(u.user) === lc(d.buyer) ? t(' (Besteller)') : '')), h('div', { class: 'row' }, flagBadge(u, 'done'), lc(u.user) === lc(d.buyer) ? null : flagBadge(u, 'paid'))),
-          u.items.length ? itemsTable(u) : h('div', { class: 'muted' }, t('noch nichts')),
-          h(
-            'div',
-            { class: 'row between muted', style: 'margin-top:6px' },
-            h('span', null, `${t('Artikel')} ${eur(u.subtotal_cents)}${u.fee_cents ? ` + ${t('Lieferanteil')} ${eur(u.fee_cents)}` : ''}`),
-            h('strong', { style: 'color:var(--fg)' }, eur(u.total_cents))
-          )
-        )
-      )
+      ...ready.map(card),
+      ...(unready.length ? [h('div', { class: 'unready-gap' }), h('div', { class: 'unready-block' }, h('div', { class: 'unready-sep' }, t('Noch nicht ready – zählt nicht in der Bestellung')), ...unready.map(card))] : [])
     );
   }
 
@@ -264,7 +382,7 @@ export function roundView(id) {
     for (const el of [inArticle, inVariant, inPrice, inQty, addBtn]) el.disabled = locked;
     const mineU = d.users.find((u) => lc(u.user) === lc(me));
     if (!mineU) {
-      mineList.replaceChildren(h('h3', null, t('Meine Artikel')), h('div', { class: 'muted' }, locked ? t('Bestellung ist gesperrt.') : t('Noch nichts eingetragen.')));
+      mineList.replaceChildren(h('h3', null, t('Meine Artikel')), h('div', { class: 'muted' }, locked ? t('Bestellung ist geschlossen.') : t('Noch nichts eingetragen.')));
       return;
     }
     const stepper = (i, delta) =>
@@ -281,37 +399,34 @@ export function roundView(id) {
         delta > 0 ? '+' : '−'
       );
     mineList.replaceChildren(
-      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Meine Artikel')), h('div', { class: 'row' }, flagBadge(mineU, 'done'), lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
+      h('div', { class: 'ready-strip ' + (mineU.done ? 'on' : 'pale') }, mineU.done ? t('✓ ready') : t('unready – Artikel zählen nicht')),
+      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Meine Artikel')), h('div', { class: 'row' }, lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
       mineU.items.length
         ? h(
-            'table',
-            null,
-            h(
-              'tbody',
-              null,
-              mineU.items.map((i) =>
-                h(
-                  'tr',
-                  null,
-                  h('td', null, i.article, i.variant ? ` · ${i.variant}` : '', h('div', { class: 'muted' }, `à ${eur(i.price_cents)}`)),
-                  h('td', { class: 'num' }, h('div', { class: 'row', style: 'justify-content:flex-end;flex-wrap:nowrap' }, stepper(i, -1), h('strong', null, String(i.qty)), stepper(i, 1))),
-                  h('td', { class: 'num' }, eur(i.price_cents * i.qty)),
+            'div',
+            { class: 'item-list' },
+            mineU.items.map((i) =>
+              h(
+                'div',
+                { class: 'item-row item-line' },
+                col('qty', h('div', { class: 'row', style: 'flex-wrap:nowrap;gap:4px' }, stepper(i, -1), h('strong', null, String(i.qty)), stepper(i, 1))),
+                col('art', i.article),
+                col('var', h('span', { class: 'muted' }, i.variant)),
+                col('price', eur(i.price_cents)),
+                col(
+                  'act',
                   h(
-                    'td',
-                    null,
-                    h(
-                      'button',
-                      {
-                        class: 'btn small danger',
-                        disabled: locked,
-                        title: t('Entfernen'),
-                        onclick: async () => {
-                          await act(() => api('DELETE', `/items/${i.id}`));
-                          nav.current.refresh();
-                        },
+                    'button',
+                    {
+                      class: 'btn small danger',
+                      disabled: locked,
+                      title: t('Entfernen'),
+                      onclick: async () => {
+                        await act(() => api('DELETE', `/items/${i.id}`));
+                        nav.current.refresh();
                       },
-                      '✕'
-                    )
+                    },
+                    '✕'
                   )
                 )
               )
@@ -324,7 +439,13 @@ export function roundView(id) {
         h('span', { class: 'muted' }, `${t('Artikel')} ${eur(mineU.subtotal_cents)}${mineU.fee_cents ? ` + ${t('Lieferanteil')} ${eur(mineU.fee_cents)}` : ''}`),
         h('strong', null, `${t('Summe')} ${eur(mineU.total_cents)}`)
       ),
-      h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted' }, t('Fertig = deine Bestellung ist komplett. Bezahlt = du hast dem Besteller dein Geld gegeben.')))
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted' }, t('Ready = deine Bestellung ist komplett. Bezahlt = du hast dem Besteller dein Geld gegeben.'))),
+      h(
+        'div',
+        { class: 'ready-bar' + (mineU.done ? ' is-done' : '') },
+        mineU.done ? h('span', null, t('✓ Ready')) : null,
+        h('button', { class: 'btn ready', type: 'button', onclick: () => toggle('done', { user: mineU.user, value: !mineU.done }) }, mineU.done ? t('Artikel ändern') : t('✓ Ich bin ready'))
+      )
     );
   }
 
@@ -352,7 +473,7 @@ export function roundView(id) {
                   'tr',
                   null,
                   h('td', { class: 'num' }, `${g.qty}×`),
-                  h('td', null, g.article, g.variant ? ` · ${g.variant}` : '', h('div', { class: 'muted' }, g.users.map((x) => (x.qty > 1 ? `${x.user} ${x.qty}×` : x.user)).join(', ')), g.price_differs ? h('div', { class: 'warn-text' }, t('⚠ Preis prüfen – zuletzt {p}', { p: eur(g.known_price_cents) })) : null),
+                  h('td', null, g.article, g.variant ? ` · ${g.variant}` : '', h('div', { class: 'muted' }, g.users.map((x) => (x.qty > 1 ? `${x.user} ${x.qty}×` : x.user)).join(', ')), g.price_differs ? h('div', { class: 'warn-text' }, t('Preis prüfen – zuletzt {p}', { p: eur(g.known_price_cents) })) : null),
                   h('td', { class: 'num' }, eur(g.price_cents)),
                   h('td', { class: 'num' }, eur(g.sum_cents))
                 )
@@ -367,7 +488,7 @@ export function roundView(id) {
             )
           )
         : h('p', { class: 'muted' }, t('Noch keine Positionen.')),
-      h('div', { class: 'notice', style: 'margin-top:10px' }, h('strong', null, t('⚠ Preise sind Angaben der User und nicht geprüft. ')), t('Vor dem Bestellen mit der Karte abgleichen.')),
+      h('div', { class: 'notice', style: 'margin-top:10px' }, h('strong', null, t('Preise sind Angaben der User und nicht geprüft. ')), t('Vor dem Bestellen mit der Karte abgleichen.')),
       h(
         'div',
         { class: 'row', style: 'margin-top:10px' },
@@ -397,7 +518,7 @@ export function roundView(id) {
     if (!hasOrders) return;
     const meU = d.users.find((u) => lc(u.user) === lc(me));
     const isBuyer = lc(me) === lc(d.buyer);
-    const rows = [h('h3', null, t('💳 Bezahlen an {buyer}', { buyer: d.buyer }))];
+    const rows = [h('h3', null, t('Bezahlen an {buyer}', { buyer: d.buyer }))];
     if (!d.paypal_visible) rows.push(h('div', { class: 'muted' }, t('PayPal-Adresse ist nur für Teilnehmer der Bestellung sichtbar.')));
     else if (!d.paypal) rows.push(h('div', { class: 'muted' }, t('Keine PayPal-Adresse hinterlegt.')));
     else {
@@ -471,9 +592,10 @@ export function roundView(id) {
 
   function updateTimer() {
     if (!d) return;
+    updateEta();
     const left = d.expires_at - (Date.now() + skew);
     if (left <= 0) {
-      timerNum.textContent = t('GESPERRT');
+      timerNum.textContent = t('GESCHLOSSEN');
       timerNum.className = 'timer done';
       if (!d.locked && !expiredRefreshed) {
         expiredRefreshed = true;
@@ -500,8 +622,10 @@ export function roundView(id) {
         catalogLoaded = true;
         loadCatalog();
       }
+      api('GET', '/rounds').then(renderPick).catch(() => {});
       renderHead();
       renderTimerControls();
+      renderOrderStatus();
       renderBanners();
       renderUsers();
       renderMine();
@@ -512,6 +636,8 @@ export function roundView(id) {
     },
     destroy() {
       clearInterval(tick);
+      stopEdit();
+      document.getElementById('statusbar').replaceChildren();
     },
   };
 }

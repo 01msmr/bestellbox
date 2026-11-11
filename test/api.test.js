@@ -66,7 +66,7 @@ test('Runde: Gruppierung, Liefergebühr, Schulden, Rechte', async () => {
     assert.equal(d.unpaid, false);
 
     // Wieder öffnen
-    const re = await call('POST', `/api/rounds/${id}/time`, 'uli', { action: 'extend', minutes: 5 });
+    const re = await call('POST', `/api/rounds/${id}/time`, 'uli', { action: 'reopen', minutes: 5 });
     assert.equal(re.body.locked, false);
 
     // Restaurant gespeichert
@@ -83,6 +83,8 @@ test('Unbezahlte Runde und Statistik', async () => {
     const id = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Burger Hub' } })).body.id;
     await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cheeseburger', price: 9, qty: 2 });
     await call('POST', `/api/rounds/${id}/items`, 'bob', { article: 'Cheeseburger', price: 9, qty: 1 });
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    await call('POST', `/api/rounds/${id}/done`, 'bob', { value: true });
     await call('POST', `/api/rounds/${id}/time`, 'uli', { action: 'lock' });
 
     const list = (await call('GET', '/api/rounds', 'uli')).body;
@@ -139,6 +141,8 @@ test('Katalog, Varianten, Preishinweis', async () => {
     assert.equal(d.groups.find((g) => g.variant.toLowerCase() === '26 cm').qty, 2);
 
     // Nächste Runde: Preisabweichung wird markiert, nichts wird automatisch gesetzt
+    await call('POST', `/api/rounds/${r1}/time`, 'uli', { action: 'lock' });
+    await call('PATCH', `/api/rounds/${r1}`, 'uli', { ordered: true });
     const r2 = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'roma' } })).body.id;
     await add(r2, 'uli', 'Pizza Margherita', '9,00', '26 cm');
     await add(r2, 'anna', 'Pizza Margherita', '8,50', '26 cm');
@@ -173,6 +177,8 @@ test('Gemerkte Lieferkosten/PayPal, PayPal geschützt', async () => {
     // Gemerkt: Adresse je Besteller, Lieferkosten je Restaurant
     assert.equal((await call('GET', '/api/me/paypal', 'uli')).body.paypal, 'paypal.me/uli');
     assert.equal((await call('GET', '/api/restaurants', 'x')).body[0].last_delivery_fee_cents, 250);
+    await call('POST', `/api/rounds/${r1}/time`, 'uli', { action: 'lock' });
+    await call('PATCH', `/api/rounds/${r1}`, 'uli', { ordered: true });
     const r2 = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Roma' } })).body.id;
     assert.equal((await call('GET', `/api/rounds/${r2}`, 'uli')).body.paypal, 'paypal.me/uli', 'Adresse wird übernommen');
   } finally {
@@ -218,4 +224,190 @@ test('Schließen-wenn-fertig: neue User brauchen Freigabe', async () => {
     d = (await call('GET', `/api/rounds/${id}`, 'uli')).body;
     assert.deepEqual(d.pending, []);
   } finally { await close(); }
+});
+
+test('Geschlossene Runde: Artikel nicht fertiger User zählen nicht, Wieder öffnen bringt sie zurück', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Pizza' }, buyer: 'uli', paypal: '', delivery_fee: '0', minutes: 20 })).body;
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cola', price: '2,50', qty: 1 });
+    await call('POST', `/api/rounds/${id}/items`, 'bob', { article: 'Pizza', price: '9', qty: 1 });
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    await call('POST', `/api/rounds/${id}/time`, 'uli', { action: 'lock' });
+    let d = (await call('GET', `/api/rounds/${id}`, 'uli')).body;
+    assert.deepEqual(d.groups.map((g) => g.article), ['Cola']);
+    assert.equal(d.items_total_cents, 250);
+    assert.deepEqual(d.debts.map((x) => x.user), ['anna']);
+    const bob = d.users.find((u) => u.user === 'bob');
+    assert.equal(bob.excluded, true);
+    assert.equal(bob.items.length, 1, 'Artikel bleiben sichtbar');
+    await call('POST', `/api/rounds/${id}/time`, 'uli', { action: 'reopen', minutes: 5 });
+    d = (await call('GET', `/api/rounds/${id}`, 'uli')).body;
+    assert.equal(d.items_total_cents, 1150);
+  } finally {
+    await close();
+  }
+});
+
+test('Änderung der eigenen Artikel setzt den User wieder auf „nicht fertig“', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Pizza' }, minutes: 20 })).body;
+    const state = async () => (await call('GET', `/api/rounds/${id}`, 'uli')).body;
+    const anna = async () => (await state()).users.find((u) => u.user === 'anna').done;
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cola', price: '2,50' });
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    assert.equal(await anna(), true);
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Pizza', price: '9' });
+    assert.equal(await anna(), false, 'neuer Artikel');
+    const itemId = (await state()).users.find((u) => u.user === 'anna').items[0].id;
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    await call('PATCH', `/api/items/${itemId}`, 'anna', { qty: 2 });
+    assert.equal(await anna(), false, 'Menge geändert');
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    await call('DELETE', `/api/items/${itemId}`, 'anna');
+    assert.equal(await anna(), false, 'Artikel gelöscht');
+    assert.equal((await state()).ready.done, 0);
+  } finally {
+    await close();
+  }
+});
+
+test('Pro Restaurant nur eine Bestellung gleichzeitig; Bestellt + Lieferzeit', async () => {
+  const { call, close } = await boot();
+  try {
+    const mk = (name) => call('POST', '/api/rounds', 'uli', { restaurant: { name }, minutes: 20 });
+    const a = (await mk('Pizza Roma')).body.id;
+    assert.equal((await mk('pizza roma')).status, 409, 'offen -> gesperrt');
+    assert.equal((await mk('Burger Hub')).status, 201, 'anderes Restaurant geht');
+    await call('POST', `/api/rounds/${a}/time`, 'uli', { action: 'lock' });
+    assert.equal((await mk('Pizza Roma')).status, 409, 'geschlossen, aber nicht bestellt');
+
+    assert.equal((await call('PATCH', `/api/rounds/${a}`, 'anna', { ordered: true })).status, 403);
+    assert.equal((await call('PATCH', `/api/rounds/${a}`, 'uli', { ordered: true, eta_minutes: 999 })).status, 400);
+    const r = await call('PATCH', `/api/rounds/${a}`, 'uli', { ordered: true, eta_minutes: 40 });
+    assert.equal(r.status, 200);
+    assert.ok(r.body.ordered_at > 0);
+    assert.ok(Math.abs(r.body.eta_at - (Date.now() + 40 * 60000)) < 5000);
+    assert.equal((await mk('Pizza Roma')).status, 201, 'geschlossen + bestellt -> neue Bestellung möglich');
+
+    const open = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Sushi' } })).body.id;
+    assert.equal((await call('PATCH', `/api/rounds/${open}`, 'uli', { ordered: true })).status, 400, 'bestellt nur nach dem Schließen');
+    await call('POST', `/api/rounds/${open}/time`, 'uli', { action: 'lock' });
+    assert.equal((await call('PATCH', `/api/rounds/${open}`, 'uli', { ordered: true })).status, 200);
+    assert.equal((await call('GET', '/api/rounds', 'uli')).body.find((x) => x.id === open).ordered, true);
+  } finally {
+    await close();
+  }
+});
+
+test('„ready“ kann nur der User selbst setzen, auch nicht Ersteller/Admin', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Pizza' }, minutes: 20 })).body;
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cola', price: '2,50' });
+    for (const who of ['uli', 'root']) {
+      assert.equal((await call('POST', `/api/rounds/${id}/done`, who, { user: 'anna', value: true })).status, 403, `${who} darf nicht`);
+    }
+    assert.equal((await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true })).status, 200);
+    assert.equal((await call('POST', `/api/rounds/${id}/paid`, 'uli', { user: 'anna', value: true })).status, 200, 'bezahlt setzt weiter der Besteller');
+  } finally {
+    await close();
+  }
+});
+
+test('Bekannte Namen: eindeutig, ohne Groß/Klein-Duplikate', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'Uli', { restaurant: { name: 'Pizza' }, minutes: 20 })).body;
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cola', price: '2,50' });
+    await call('POST', `/api/rounds/${id}/items`, 'ANNA', { article: 'Pizza', price: '9' });
+    await call('POST', `/api/rounds/${id}/items`, 'bob', { article: 'Cola', price: '2,50' });
+    const names = (await call('GET', '/api/users', 'uli')).body;
+    assert.deepEqual(names.map((n) => n.toLowerCase()).sort(), ['anna', 'bob', 'uli']);
+  } finally {
+    await close();
+  }
+});
+
+test('Restaurant merkt Adresse/Web/Telefon (leer überschreibt nicht); Geliefert und Lieferzeit', async () => {
+  const { call, close } = await boot();
+  try {
+    const mk = (restaurant) => call('POST', '/api/rounds', 'uli', { restaurant, minutes: 20, delivery_fee: '2,50' });
+    const a = (await mk({ name: 'Roma', url: 'https://roma.example', phone: '07531 1', address: 'Hafenstr. 1, Konstanz' })).body.id;
+    await call('POST', `/api/rounds/${a}/time`, 'uli', { action: 'lock' });
+    await call('PATCH', `/api/rounds/${a}`, 'uli', { ordered: true });
+    assert.equal((await call('PATCH', `/api/rounds/${a}`, 'anna', { delivered: true })).status, 403);
+    await call('PATCH', `/api/rounds/${a}`, 'uli', { ordered: false });
+    assert.equal((await call('PATCH', `/api/rounds/${a}`, 'uli', { delivered: true })).status, 400, 'erst bestellt melden');
+    await call('PATCH', `/api/rounds/${a}`, 'uli', { ordered: true });
+    const done = await call('PATCH', `/api/rounds/${a}`, 'uli', { delivered: true });
+    assert.equal(done.status, 200);
+    assert.ok(done.body.delivered_at > 0);
+
+    await mk({ name: 'roma' }); // leere Felder überschreiben nichts
+    const r = (await call('GET', '/api/restaurants', 'uli')).body.find((x) => x.name === 'Roma');
+    assert.equal(r.address, 'Hafenstr. 1, Konstanz');
+    assert.equal(r.url, 'https://roma.example');
+    assert.equal(r.phone, '07531 1');
+    assert.equal(r.last_delivery_fee_cents, 250);
+    assert.equal(r.delivery_count, 1);
+    assert.equal(r.delivery_minutes, 0);
+  } finally {
+    await close();
+  }
+});
+
+test('Export: nur Admin, JSON mit Artikelzeilen', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Pizza Roma' }, minutes: 20, delivery_fee: '3' })).body;
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Margherita', variant: '26 cm', price: '8,50', qty: 2 });
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    assert.equal((await call('GET', '/api/export', 'uli')).status, 403);
+    const js = await call('GET', '/api/export', 'root');
+    assert.equal(js.status, 200);
+    assert.equal(js.body.length, 1);
+    assert.equal(js.body[0].Restaurant, 'Pizza Roma');
+    assert.equal(js.body[0].User, 'anna');
+    assert.equal(js.body[0].Menge, 2);
+    assert.equal(js.body[0].Summe, 17);
+    assert.equal(js.body[0].Ready, true);
+  } finally {
+    await close();
+  }
+});
+
+test('Verlängern nur bei offener Runde; Wieder öffnen nur geschlossen und nicht bestellt', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Pizza' }, minutes: 20 })).body;
+    const time = (action) => call('POST', `/api/rounds/${id}/time`, 'uli', { action, minutes: 5 });
+    assert.equal((await time('reopen')).status, 400, 'offen: nichts wieder zu öffnen');
+    assert.equal((await time('extend')).status, 200, 'offen: verlängern');
+    await time('lock');
+    assert.equal((await time('extend')).status, 400, 'geschlossen: erst wieder öffnen');
+    assert.equal((await time('reopen')).status, 200);
+    assert.equal((await call('GET', `/api/rounds/${id}`, 'uli')).body.locked, false);
+    await time('lock');
+    await call('PATCH', `/api/rounds/${id}`, 'uli', { ordered: true });
+    assert.equal((await time('reopen')).status, 400, 'bestellt: erst zurücknehmen');
+    assert.equal((await time('extend')).status, 400);
+    await call('PATCH', `/api/rounds/${id}`, 'uli', { ordered: false });
+    assert.equal((await time('reopen')).status, 200);
+  } finally {
+    await close();
+  }
+});
+
+test('„Schließen, wenn alle ready“ nur bei offener Runde änderbar', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Pizza' }, minutes: 20 })).body;
+    assert.equal((await call('PATCH', `/api/rounds/${id}`, 'uli', { close_when_ready: true })).status, 200);
+    await call('POST', `/api/rounds/${id}/time`, 'uli', { action: 'lock' });
+    assert.equal((await call('PATCH', `/api/rounds/${id}`, 'uli', { close_when_ready: false })).status, 400);
+  } finally {
+    await close();
+  }
 });
