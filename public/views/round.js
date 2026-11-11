@@ -254,7 +254,7 @@ export function roundView(id) {
     const patch = (body) => act(() => api('PATCH', `/rounds/${id}`, body)).then(() => nav.current.refresh());
     const eta = inEta.value === '' ? {} : { eta_minutes: Number(inEta.value) };
     const kids = [];
-    if (ordered) kids.push(h('div', { class: 'banner ok' }, `✓ ${t('Bestellt um {time}', { time: fmtClock(d.ordered_at) })}`), d.delivered_at ? h('div', { class: 'banner ok' }, `✓ ${t('Geliefert nach {n} min', { n: Math.max(1, Math.round((d.delivered_at - d.ordered_at) / 60000)) })}`) : etaText);
+    if (ordered && !d.delivered_at) kids.push(etaText);
     if (manage) {
       kids.push(
         d.delivered_at ? null : h('label', { class: 'row muted' }, t('Lieferzeit (Minuten, geschätzt)'), inEta, d.restaurant.delivery_count ? h('span', null, t('Ø {n} min bei diesem Restaurant', { n: d.restaurant.delivery_minutes })) : null),
@@ -320,6 +320,8 @@ export function roundView(id) {
     } else {
       b.push(h('div', { class: 'banner ok' }, t('✓ Alle ready ({total}/{total}) – es kann bestellt werden.', { total: d.ready.total })));
     }
+    if (d.ordered_at) b.push(h('div', { class: 'banner ok' }, `✓ ${t('Bestellt um {time}', { time: fmtClock(d.ordered_at) })}`));
+    if (d.ordered_at && d.delivered_at) b.push(h('div', { class: 'banner ok' }, `✓ ${t('Geliefert nach {n} min', { n: Math.max(1, Math.round((d.delivered_at - d.ordered_at) / 60000)) })}`));
     if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('Bestellung unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
     for (const u of d.pending) {
       b.unshift(h('div', { class: 'banner bad row between' },
