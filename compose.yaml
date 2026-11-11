@@ -1,5 +1,5 @@
 services:
-  bestellbox:
+  dinedock:
     build: .
     restart: unless-stopped
     environment:
@@ -7,6 +7,6 @@ services:
     ports:
       - "127.0.0.1:3000:3000"  # lokal; im Toolbox-Netz auf 0.0.0.0 oder Reverse-Proxy ändern
     volumes:
-      - bestellbox-data:/data
+      - dinedock-data:/data
 volumes:
-  bestellbox-data:
+  dinedock-data:

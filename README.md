@@ -1,4 +1,4 @@
-# dinedock (bisher bestellbox)
+# dinedock
 
 Gemeinsame Essensbestellung für die Toolbox Bodensee. Eine Person startet eine **Bestellung** bei einem Restaurant,
 alle tragen Artikel ein, markieren sich als **ready** und später als **bezahlt**. Alle sehen live denselben Stand.
@@ -74,10 +74,10 @@ npm test
 |-----------|------------------------|-------------------------------|
 | `HOST`    | `127.0.0.1`            | Bind-Adresse                  |
 | `PORT`    | `3000`                 | Port                          |
-| `DB_FILE` | `./data/bestellbox.db` | SQLite-Datei                  |
+| `DB_FILE` | `./data/dinedock.db` | SQLite-Datei                  |
 | `ADMINS`  | leer                   | Usernamen, kommagetrennt      |
 
-Docker: `docker compose up -d` (Daten im Volume `bestellbox-data`).
+Docker: `docker compose up -d` (Daten im Volume `dinedock-data`).
 
 ## Hinweis zur Sicherheit
 

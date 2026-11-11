@@ -1,4 +1,4 @@
-/* bestellbox – minimalistisch. Modus (auto/hell/dunkel) über color-scheme + light-dark(),
+/* dinedock – minimalistisch. Modus (auto/hell/dunkel) über color-scheme + light-dark(),
    Farbthema über [data-theme] (mono = schwarz/weiß, ozean, gruen, orange, mais). */
 
 :root { color-scheme: light dark; }
