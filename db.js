@@ -214,6 +214,7 @@ export function createLogic(db, { admins = [] } = {}) {
     return r;
   }
 
+  const isBuyer = (r, user) => !!user && lower(user) === lower(r.buyer);
   const canManage = (r, user) => !!user && (isAdmin(user) || lower(user) === lower(r.creator) || lower(user) === lower(r.buyer));
 
   function createRound(user, body) {
@@ -267,7 +268,11 @@ export function createLogic(db, { admins = [] } = {}) {
     }
     q.roundUpdate.run(buyer, paypal, fee, r.id);
     q.roundOrder.run(orderedAt, etaAt, expires, deliveredAt, r.id);
-    if (body.approve) { q.partApprove.run(r.id, cleanUser(body.approve)); autoLock(r.id); }
+    if (body.approve) {
+      if (r.ordered_at) throw new HttpError(400, 'Bestellt – keine neuen User mehr');
+      q.partApprove.run(r.id, cleanUser(body.approve));
+      autoLock(r.id);
+    }
     if (body.reject) q.partDrop.run(r.id, cleanUser(body.reject));
     if (body.close_when_ready !== undefined) {
       if (isLocked(r, now)) throw new HttpError(400, 'Bestellung ist geschlossen');
@@ -303,6 +308,7 @@ export function createLogic(db, { admins = [] } = {}) {
       if (action === 'reopen' && !closed) throw new HttpError(400, 'Die Bestellung ist noch offen');
       q.roundExpiry.run(Math.max(now, r.expires_at) + m * 60000, r.id);
     } else if (action === 'set') {
+      if (r.ordered_at) throw new HttpError(400, 'Erst „Bestellt“ zurücknehmen');
       const m = Number(minutes);
       if (!Number.isFinite(m) || m < LIMITS.deadlineMinMinutes || m > LIMITS.deadlineMaxMinutes) throw new HttpError(400, 'Ablaufzeit 1–240 Minuten');
       q.roundExpiry.run(now + m * 60000, r.id);
@@ -381,8 +387,9 @@ export function createLogic(db, { admins = [] } = {}) {
     const target = cleanUser(body.user || user);
     const self = lower(target) === lower(user);
     if (flag === 'done' && !self) throw new HttpError(403, 'Nur du selbst kannst deine Artikel als ready bestätigen');
-    if (!self && !canManage(r, user)) throw new HttpError(403, 'Nur für sich selbst (oder als Ersteller/Besteller/Admin)');
+    if (!self && !isBuyer(r, user)) throw new HttpError(403, 'Bezahlt setzt nur der User selbst oder der Besteller');
     const value = body.value ? 1 : 0;
+    if (r.ordered_at && !q.partGet.get(r.id, target)?.approved) throw new HttpError(423, 'Bestellt – keine neuen User mehr');
     if (self) admit(r, target);
     q.partUpsert.run(r.id, target);
     (flag === 'done' ? q.partSetDone : q.partSetPaid).run(value, r.id, target);
@@ -489,8 +496,8 @@ export function createLogic(db, { admins = [] } = {}) {
       debts_total_cents: debts.reduce((a, d) => a + d.amount_cents, 0),
       unpaid: locked && debts.length > 0,
       viewer: viewer
-        ? { user: viewer, can_manage: canManage(r, viewer), is_admin: isAdmin(viewer) }
-        : { user: '', can_manage: false, is_admin: false },
+        ? { user: viewer, can_manage: canManage(r, viewer), is_buyer: isBuyer(r, viewer), is_admin: isAdmin(viewer) }
+        : { user: '', can_manage: false, is_buyer: false, is_admin: false },
     };
   }
 

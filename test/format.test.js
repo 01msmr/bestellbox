@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtRemaining, genitive } from '../public/format.js';
+import { fmtRemaining, genitive, payHref, joinList } from '../public/format.js';
 import { isCurrentRound } from '../public/group.js';
 
 const MIN = 60000;
@@ -55,4 +55,21 @@ test('pendingRound: offen oder geschlossen-unbestellt (12 h) blockiert, bestellt
   assert.equal(pendingRound([mk({ locked: true, created_at: now - 13 * 3600000 })], 'Pizza Roma', now, 12), null);
   assert.equal(pendingRound([mk({})], 'Burger', now, 12), null);
   assert.equal(pendingRound([mk({})], '', now, 12), null);
+});
+
+test('payHref: PayPal-Name/-Link, Betrag optional, sonst kein Link', () => {
+  assert.equal(payHref('uli', 1250), 'https://paypal.me/uli/12.50EUR');
+  assert.equal(payHref('https://paypal.me/uli/', 500), 'https://paypal.me/uli/5.00EUR');
+  assert.equal(payHref('paypal.me/uli'), 'https://paypal.me/uli', 'ohne Betrag nur die Adresse');
+  assert.equal(payHref('paypal.me/uli', 0), 'https://paypal.me/uli');
+  assert.equal(payHref('DE12 3456 7890'), null, 'keine PayPal-Adresse');
+  assert.equal(payHref(''), null);
+});
+
+test('joinList: Komma-Liste mit „und“ vor dem letzten Eintrag', () => {
+  assert.equal(joinList([], 'und'), '');
+  assert.equal(joinList(['A'], 'und'), 'A');
+  assert.equal(joinList(['A', 'B'], 'und'), 'A und B');
+  assert.equal(joinList(['darkc', 'mister H', 'David'], 'und'), 'darkc, mister H und David');
+  assert.equal(joinList(['A', 'B', 'C'], 'and'), 'A, B and C');
 });

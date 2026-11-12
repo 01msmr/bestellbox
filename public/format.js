@@ -29,3 +29,20 @@ export function medianMinutes(durationsMs) {
   const ms = s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
   return Math.round(ms / 60000);
 }
+
+/** PayPal-Link aus Adresse; mit Betrag (Cent) wenn > 0, sonst nur die Adresse. Keine PayPal-Adresse → null. */
+export function payHref(addr, cents) {
+  const a = String(addr ?? '').trim();
+  let base = null;
+  if (/^https?:\/\/(www\.)?paypal\.me\/[\w.-]+\/?$/i.test(a)) base = a.replace(/\/$/, '');
+  else if (/^(www\.)?paypal\.me\/[\w.-]+\/?$/i.test(a)) base = 'https://' + a.replace(/\/$/, '');
+  else if (/^[\w.-]+$/.test(a)) base = 'https://paypal.me/' + a;
+  if (!base) return null;
+  return cents > 0 ? `${base}/${(cents / 100).toFixed(2)}EUR` : base;
+}
+
+/** „A, B und C“ – Komma-Liste mit Bindewort vor dem letzten Eintrag. */
+export function joinList(items, and) {
+  if (items.length < 2) return items.join('');
+  return `${items.slice(0, -1).join(', ')} ${and} ${items[items.length - 1]}`;
+}

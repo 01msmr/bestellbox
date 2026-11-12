@@ -2,8 +2,8 @@
 import { t, lang } from '/i18n.js';
 import { LIMITS, DEFAULTS, LISTS, TIMING } from '/config.js';
 import { isCurrentRound } from '/group.js';
-import { genitive } from '/format.js';
-import { app, eur, fmtDate, fmtWhen, fmtClock, lc, h, toast, api, act, me, telHref, payHref, contactLinks, fmtRemaining, fold, parseMoney, nav } from '/util.js';
+import { genitive, payHref, joinList } from '/format.js';
+import { app, eur, fmtDate, fmtWhen, fmtClock, lc, h, toast, api, act, me, telHref, contactLinks, fmtRemaining, fold, parseMoney, nav } from '/util.js';
 
 export function roundView(id) {
   let d = null;
@@ -136,7 +136,7 @@ export function roundView(id) {
     const on = u[flag];
     const label = flag === 'done' ? (on ? t('✓ ready') : t('unready')) : on ? t('✓ bezahlt') : t('nicht bezahlt');
     const cls = on ? 'on' : flag === 'done' ? 'pale' : 'off';
-    const editable = lc(u.user) === lc(me) || (flag === 'paid' && d.viewer.can_manage);
+    const editable = lc(u.user) === lc(me) || (flag === 'paid' && d.viewer.is_buyer);
     if (!editable || flag === 'done') return h('span', { class: `badge ${cls}` }, label); // ready wird nur über den Button gesetzt
     return h('button', { class: `badge ${cls}`, title: t('Umschalten'), onclick: () => toggle(flag, { user: u.user, value: !on }) }, label);
   }
@@ -325,7 +325,7 @@ export function roundView(id) {
     } else {
       b.push(h('div', { class: 'banner ok' }, t('✓ Alle ready ({total}/{total}) – es kann bestellt werden.', { total: d.ready.total })));
     }
-    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t('Bestellung unbezahlt: {sum} offen ({names})', { sum: eur(d.debts_total_cents), names: d.debts.map((x) => x.user).join(', ') })));
+    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t(d.debts.length === 1 ? '{n} Nutzer hat noch nicht bezahlt: {names} ({sum} offen)' : '{n} Nutzer haben noch nicht bezahlt: {names} ({sum} offen)', { n: d.debts.length, names: joinList(d.debts.map((x) => x.user), t('und')), sum: eur(d.debts_total_cents) })));
     for (const u of d.pending) {
       b.unshift(h('div', { class: 'banner bad row between' },
         h('span', null, t('Neu: {user} möchte mitbestellen', { user: u })),
@@ -532,7 +532,9 @@ export function roundView(id) {
         h(
           'div',
           { class: 'row between' },
-          h('strong', { class: 'payaddr' }, d.paypal),
+          !isBuyer && payHref(d.paypal, meU && !meU.paid ? meU.total_cents : 0)
+            ? h('a', { class: 'payaddr', href: payHref(d.paypal, meU && !meU.paid ? meU.total_cents : 0), target: '_blank', rel: 'noopener noreferrer' }, d.paypal)
+            : h('strong', { class: 'payaddr' }, d.paypal),
           h(
             'button',
             {
@@ -587,7 +589,7 @@ export function roundView(id) {
                   'span',
                   { class: 'row' },
                   h('strong', null, eur(x.amount_cents)),
-                  lc(x.user) === lc(me) || d.viewer.can_manage
+                  lc(x.user) === lc(me) || d.viewer.is_buyer
                     ? h('button', { class: 'btn small ghost', onclick: () => toggle('paid', { user: x.user, value: true }) }, t('bezahlt'))
                     : null
                 )

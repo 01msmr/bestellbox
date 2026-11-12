@@ -101,14 +101,6 @@ export function telHref(p) {
   return d ? 'tel:' + d : null;
 }
 // PayPal-Link mit Betrag (nur für paypal.me-Adressen möglich; E-Mail-Adressen werden nur angezeigt)
-export function payHref(addr, cents) {
-  const a = String(addr ?? '').trim();
-  let base = null;
-  if (/^https?:\/\/(www\.)?paypal\.me\/[\w.-]+\/?$/i.test(a)) base = a.replace(/\/$/, '');
-  else if (/^(www\.)?paypal\.me\/[\w.-]+\/?$/i.test(a)) base = 'https://' + a.replace(/\/$/, '');
-  else if (/^[\w.-]+$/.test(a)) base = 'https://paypal.me/' + a;
-  return base ? `${base}/${(cents / 100).toFixed(2)}EUR` : null;
-}
 export function contactLinks(r) {
   const tel = telHref(r.phone);
   const web = webHref(r.url);
