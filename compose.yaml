@@ -5,7 +5,7 @@ services:
     environment:
       ADMINS: "${ADMINS:-}"      # kommagetrennt (z. B. per .env); dürfen jede Runde verwalten
     ports:
-      - "127.0.0.1:3000:3000"  # lokal; im Toolbox-Netz auf 0.0.0.0 oder Reverse-Proxy ändern
+      - "127.0.0.1:3000:3000"  # lokal; im lokalen Netz auf 0.0.0.0 oder Reverse-Proxy ändern
     volumes:
       - dinedock-data:/data
 volumes:

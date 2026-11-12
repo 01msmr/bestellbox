@@ -1,6 +1,6 @@
 # dinedock
 
-Gemeinsame Essensbestellung für die Toolbox Bodensee. Eine Person startet eine **Bestellung** bei einem Restaurant,
+Gemeinsame Essensbestellung für Gruppen. Eine Person startet eine **Bestellung** bei einem Restaurant,
 alle tragen Artikel ein, markieren sich als **ready** und später als **bezahlt**. Alle sehen live denselben Stand.
 
 ## Funktionen
@@ -116,4 +116,4 @@ mit `Cache-Control: no-cache` ausgeliefert, `index.html` hängt eine Cache-Versi
 
 Es gibt bewusst **keine Anmeldung**: Der Username kommt vom Browser und wird vertraut. Der „Schutz“ der PayPal-Adresse
 ist daher nur eine Sichtbarkeitsbeschränkung (kein Login, wer sich als Teilnehmer ausgibt, sieht sie). Das ist für ein
-vertrauenswürdiges Netz (lokal/Toolbox-LAN) gedacht. Nicht ungeschützt ins Internet stellen.
+vertrauenswürdiges Netz (lokales Netz, z. B. Büro- oder Heimnetz) gedacht. Nicht ungeschützt ins Internet stellen.
