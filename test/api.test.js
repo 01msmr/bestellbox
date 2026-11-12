@@ -510,3 +510,24 @@ test('Ab „Bestellt“: keine Artikeländerung, keine neuen User, Frist nicht n
     await close();
   }
 });
+
+test('Ab „Bestellt“: Bestellkopf (Besteller, PayPal, Lieferkosten) nicht mehr änderbar', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'alex', { restaurant: { name: 'Pizza' }, delivery_fee: '3,00', paypal: 'paypal.me/alex', minutes: 20 })).body;
+    await call('POST', `/api/rounds/${id}/time`, 'alex', { action: 'lock' });
+    assert.equal((await call('PATCH', `/api/rounds/${id}`, 'alex', { delivery_fee: '4,00' })).status, 200, 'vor Bestellt änderbar');
+    await call('PATCH', `/api/rounds/${id}`, 'alex', { ordered: true });
+    for (const body of [{ delivery_fee: '5,00' }, { buyer: 'anna' }, { paypal: 'paypal.me/anna' }]) {
+      assert.equal((await call('PATCH', `/api/rounds/${id}`, 'alex', body)).status, 400, JSON.stringify(body));
+    }
+    const d = (await call('GET', `/api/rounds/${id}`, 'alex')).body;
+    assert.deepEqual([d.buyer, d.paypal, d.delivery_fee_cents], ['alex', 'paypal.me/alex', 400]);
+    assert.equal((await call('PATCH', `/api/rounds/${id}`, 'alex', { eta_minutes: 30 })).status, 200, 'Lieferzeit bleibt änderbar');
+    assert.equal((await call('PATCH', `/api/rounds/${id}`, 'alex', { delivered: true })).status, 200);
+    await call('PATCH', `/api/rounds/${id}`, 'alex', { ordered: false });
+    assert.equal((await call('PATCH', `/api/rounds/${id}`, 'alex', { delivery_fee: '5,00' })).status, 200, 'nach Zurücknehmen wieder änderbar');
+  } finally {
+    await close();
+  }
+});

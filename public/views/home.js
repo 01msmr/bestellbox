@@ -5,7 +5,7 @@ import { pendingRound } from '/group.js';
 import { tickCountdowns } from '/side.js';
 import { app, eur, fmtDate, lc, h, api, act, me, parseMoney } from '/util.js';
 
-export const roundItem = (r) => {
+export const roundItem = (r, highlight = false) => {
   const status = r.ordered
     ? h('span', { class: 'badge on' }, t('bestellt'))
     : r.locked
@@ -13,7 +13,7 @@ export const roundItem = (r) => {
     : h('span', { class: 'badge on', 'data-expires': r.expires_at }, '…');
   return h(
     'a',
-    { class: 'round-link', href: `#/r/${r.id}` },
+    { class: 'round-link' + (highlight === true ? ' today' : ''), href: `#/r/${r.id}` },
     h(
       'div',
       { class: 'card', style: 'padding:10px' },

@@ -122,9 +122,9 @@ export function roundView(id) {
   // Mobil untereinander; ab Desktop-Breite: links Tabs, rechts Frist/Banner/Bezahlen (siehe style.css)
   app.classList.add('wide');
   head.classList.add('round-head');
-  app.replaceChildren(
-    h('div', { class: 'round-grid' }, head, h('div', { class: 'round-main' }, tabsEl, usersPane, minePane, orderPane, debtsCard))
-  );
+  const roundMain = h('div', { class: 'round-main' }, tabsEl, usersPane, minePane, orderPane, debtsCard);
+  const roundGrid = h('div', { class: 'round-grid' }, head, roundMain);
+  app.replaceChildren(roundGrid);
   showTab(tab);
 
   const toggle = async (path, body) => {
@@ -241,6 +241,10 @@ export function roundView(id) {
       if (!i.dataset.dirty) i.value = vals[n];
     });
     syncEdit(false);
+    const locked = !!d.ordered_at; // ab „Bestellt“ nicht mehr änderbar
+    for (const i of editInputs) i.disabled = locked;
+    saveBtn.classList.toggle('hidden', locked);
+    editBar.classList.toggle('hidden', locked || editBar.classList.contains('hidden'));
   }
 
   // Bestellt-Meldung und geschätzte Lieferzeit (Ersteller/Besteller/Admins setzen, alle sehen live)
@@ -314,17 +318,21 @@ export function roundView(id) {
 
   function renderBanners() {
     const b = [];
-    if (d.delivered_at) {
-      b.push(h('div', { class: 'banner ok' }, `✓ ${t('Geliefert nach {n} min', { n: Math.max(1, Math.round((d.delivered_at - d.ordered_at) / 60000)) })}`));
-    } else if (d.ordered_at) {
-      b.push(h('div', { class: 'banner ok' }, `✓ ${t('Bestellt um {time}', { time: fmtClock(d.ordered_at) })}`));
-    } else if (d.ready.total === 0) {
-      // noch niemand dabei: kein Banner
-    } else if (d.ready.not_ready.length) {
-      b.push(h('div', { class: 'banner warn' }, t('Noch nicht alle ready ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
-    } else {
-      b.push(h('div', { class: 'banner ok' }, t('✓ Alle ready ({total}/{total}) – es kann bestellt werden.', { total: d.ready.total })));
-    }
+    const allReady = d.ready.total > 0 && !d.ready.not_ready.length;
+    const step = (cls, text, time) => h('span', { class: `step ${cls}` }, text, time ? [' \u00A0\u00A0', h('span', { class: 'step-time' }, time)] : null);
+    const sep = () => h('span', { class: 'step-sep' }, '›');
+    const readyTxt = d.ready.total ? t('ready {done}/{total}', { done: d.ready.done, total: d.ready.total }) : t('ready');
+    const opened = step('done', `✓ ${t('eröffnet')}`, fmtClock(d.created_at));
+    const ordTxt = `✓ ${t('bestellt')}`;
+    const flow = d.delivered_at
+      ? [opened, step('done', `✓ ${t('ready')}`), step('done', ordTxt, fmtClock(d.ordered_at)), step('now', `✓ ${t('geliefert')}`, t('{time} Uhr', { time: fmtClock(d.delivered_at) }))]
+      : d.ordered_at
+        ? [opened, step('done', `✓ ${t('ready')}`), step('now', ordTxt, fmtClock(d.ordered_at)), step('todo', t('geliefert'))]
+        : allReady
+          ? [opened, step('now', `✓ ${readyTxt}`), step('todo', t('bestellt')), step('todo', t('geliefert'))]
+          : null;
+    if (flow) b.push(h('div', { class: 'status-flow' }, ...flow.flatMap((x, n) => (n ? [sep(), x] : [x]))));
+    else if (d.ready.total) b.push(h('div', { class: 'banner warn' }, t('Noch nicht alle ready ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
     if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t(d.debts.length === 1 ? '{n} Nutzer hat noch nicht bezahlt: {names} ({sum} offen)' : '{n} Nutzer haben noch nicht bezahlt: {names} ({sum} offen)', { n: d.debts.length, names: joinList(d.debts.map((x) => x.user), t('und')), sum: eur(d.debts_total_cents) })));
     for (const u of d.pending) {
       b.unshift(h('div', { class: 'banner bad row between' },
@@ -488,9 +496,9 @@ export function roundView(id) {
             h(
               'tfoot',
               null,
-              h('tr', null, h('td', { colspan: 3 }, t('Summe Artikel')), h('td', { class: 'num' }, eur(d.items_total_cents))),
-              d.delivery_fee_cents ? h('tr', null, h('td', { colspan: 3 }, t('Lieferkosten')), h('td', { class: 'num' }, eur(d.delivery_fee_cents))) : null,
-              h('tr', null, h('td', { colspan: 3 }, t('Gesamt')), h('td', { class: 'num' }, eur(d.grand_total_cents)))
+              h('tr', null, h('td', { colspan: 3, class: 'foot-lbl' }, t('Summe Artikel')), h('td', { class: 'num' }, eur(d.items_total_cents))),
+              d.delivery_fee_cents ? h('tr', null, h('td', { colspan: 3, class: 'foot-lbl' }, t('Lieferkosten')), h('td', { class: 'num' }, eur(d.delivery_fee_cents))) : null,
+              h('tr', null, h('td', { colspan: 3, class: 'foot-lbl' }, t('Gesamt')), h('td', { class: 'num' }, eur(d.grand_total_cents)))
             )
           )
         : h('p', { class: 'muted' }, t('Noch keine Positionen.')),
@@ -566,12 +574,17 @@ export function roundView(id) {
     payCard.replaceChildren(...rows);
   }
 
+  let payConfirm = null; // {user, timer}: Rückfrage im Button vor „bezahlt“
   function renderDebts() {
     if (!d.users.some((u) => u.subtotal_cents > 0)) {
       debtsCard.classList.add('hidden');
       return;
     }
     debtsCard.classList.remove('hidden');
+    const top = !!(d.ordered_at && d.delivered_at); // fertig und geliefert: Beträge oben unter den Hinweisen
+    debtsCard.classList.toggle('debts-top', top);
+    if (top && debtsCard.parentNode !== roundGrid) roundGrid.prepend(debtsCard);
+    else if (!top && debtsCard.parentNode !== roundMain) roundMain.append(debtsCard);
     debtsCard.replaceChildren(
       d.debts.length
         ? h('div', { class: 'ready-strip pale' }, d.locked ? t('Offene Beträge') : t('Offene Beträge (vorläufig)'))
@@ -590,7 +603,20 @@ export function roundView(id) {
                   { class: 'row' },
                   h('strong', null, eur(x.amount_cents)),
                   lc(x.user) === lc(me) || d.viewer.is_buyer
-                    ? h('button', { class: 'btn small ghost', onclick: () => toggle('paid', { user: x.user, value: true }) }, t('bezahlt'))
+                    ? h('button', {
+                      class: payConfirm?.user === x.user ? 'btn small' : 'btn small ghost',
+                      onclick: () => {
+                        if (payConfirm?.user === x.user) {
+                          clearTimeout(payConfirm.timer);
+                          payConfirm = null;
+                          toggle('paid', { user: x.user, value: true });
+                          return;
+                        }
+                        clearTimeout(payConfirm?.timer);
+                        payConfirm = { user: x.user, timer: setTimeout(() => { payConfirm = null; renderDebts(); }, TIMING.confirmMs) };
+                        renderDebts();
+                      },
+                    }, payConfirm?.user === x.user ? t('ist bezahlt?') : t('als bezahlt markieren'))
                     : null
                 )
               )

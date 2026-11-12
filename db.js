@@ -241,6 +241,7 @@ export function createLogic(db, { admins = [] } = {}) {
     const buyer = body.buyer !== undefined ? cleanUser(body.buyer) : r.buyer;
     const paypal = body.paypal !== undefined ? collapse(body.paypal).slice(0, LIMITS.paypal) : r.paypal;
     const fee = body.delivery_fee !== undefined ? parseMoneyToCents(body.delivery_fee, { max: LIMITS.feeMaxEuro }) : r.delivery_fee_cents;
+    if (r.ordered_at && body.ordered !== false && (body.buyer !== undefined || body.paypal !== undefined || body.delivery_fee !== undefined)) throw new HttpError(400, 'Erst „Bestellt“ zurücknehmen');
     let orderedAt = r.ordered_at ?? null;
     let etaAt = r.eta_at ?? null;
     let deliveredAt = r.delivered_at ?? null;

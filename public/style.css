@@ -90,6 +90,7 @@ h2 { font-size: 18px; }
 /* Formulare */
 input, select, button { font: inherit; }
 input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+input:disabled { background: transparent; color: var(--muted); cursor: not-allowed; }
 input:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -180,8 +181,7 @@ main.wide { max-width: 1280px; }
 .sum-row.total .eur-box { font-size: 16px; }
 .num-box { flex: none; width: var(--price-w); padding: 0 11px; box-sizing: border-box; text-align: right; font-variant-numeric: tabular-nums; }
 .item-list { display: grid; gap: 6px; }
-.item-line { padding: 6px 0; border-bottom: 1px solid var(--line); }
-.item-line:last-child { border-bottom: 0; }
+.item-line { margin: 0 -8px; padding: 6px 8px; border-radius: 6px; }
 .item-line .c-price { text-align: right; font-variant-numeric: tabular-nums; }
 .item-line .c-act { justify-self: start; }
 .item-line .btn.small { padding: 2px 9px; }
@@ -302,7 +302,8 @@ button.btn.ready { margin-left: 0; padding: 11px 26px; font-size: 17px; box-shad
 }
 
 /* „Offene Beträge“ mit deutlichem Abstand (200 px inkl. Grid-Gap) zum Inhalt darüber, wie die nicht-ready Artikel */
-.round-main > .debts { margin-top: 184px; border-top: 2px dashed var(--line); }
+.round-main > .debts { margin-top: 3rem; border-top: 2px dashed var(--line); }
+.debts-top { margin-bottom: 2rem; }
 
 .side-today-link { display: block; text-decoration: none; color: var(--fg); padding: 10px 12px; }
 .side-today-link h4 { margin: 0 0 2px !important; }
@@ -325,6 +326,12 @@ input[type="checkbox"] { width: auto; flex: none; }
 .statusbar:empty { display: none; }
 .status-lines:empty { display: none; }
 .status-lines { display: grid; gap: 3px; }
+.status-flow { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 16px; font-size: 16px; }
+.status-flow .step-sep { color: var(--muted); }
+.status-flow .done { font-weight: 600; color: var(--fg); }
+.status-flow .now { font-weight: 700; background: var(--ok); color: var(--on-ok); padding: 4px 12px; border-radius: 999px; }
+.status-flow .step-time { font-weight: 400; }
+.status-flow .todo { font-weight: 300; font-style: italic; color: var(--muted); }
 .status-lines .banner { border: 0; border-radius: 0; padding: 10px 16px; font-size: 16px; font-weight: 700; text-align: center; }
 .status-lines .banner.warn { background: var(--warn); color: var(--on-warn); }
 .status-lines .banner.ok { background: var(--ok); color: var(--on-ok); }
@@ -348,3 +355,19 @@ input[type="checkbox"] { width: auto; flex: none; }
 
 
 .undo-row { margin: 8px 0; padding: 6px 10px; border: 1px dashed var(--line); border-radius: var(--radius); }
+
+/* Listenzeilen: leicht wechselnder Hintergrund statt Trennlinien */
+:root { --stripe: color-mix(in srgb, var(--fg) 5%, transparent); }
+.item-list { gap: 0; }
+.item-list .item-line:nth-child(even), .card table tbody tr:nth-child(even) { background: var(--stripe); }
+.round-link:nth-of-type(even) .card { background: color-mix(in srgb, var(--fg) 4%, var(--surface)); }
+.debts .list { gap: 6px; }
+.debts .list li { padding: 8px 10px; background: var(--stripe); border-radius: 6px; }
+.debts { container-type: inline-size; }
+@container (min-width: 640px) { .debts .list { grid-template-columns: 1fr 1fr; } }
+
+/* Heute-Bestellungen in „Alle Bestellungen“: hervorgehoben, vor der Monatsliste */
+.round-link.today .card { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: var(--accent); }
+
+/* Summenzeilen der Sammelbestellung: Bezeichnung rechtsbündig mit Abstand vor dem Wert */
+tfoot td.foot-lbl { text-align: right; padding-right: 1.5rem; }
