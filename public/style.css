@@ -109,6 +109,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .badge.on { background: var(--ok); color: var(--on-ok); }
 .badge.off { background: var(--bad); color: var(--on-bad); }
 .badge.mid { background: var(--warn); color: var(--on-warn); }
+.badge.idle { background: light-dark(#b6b6c7, #ebebfc); color: light-dark(#fff, #0f0f12); }
 .badge.pale { background: var(--wash); color: var(--muted); border-color: var(--line); }
 button.badge { cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
 button.badge:hover { filter: brightness(1.12); }
@@ -302,8 +303,6 @@ button.btn.ready { margin-left: 0; padding: 11px 26px; font-size: 17px; box-shad
 }
 
 /* „Offene Beträge“ mit deutlichem Abstand (200 px inkl. Grid-Gap) zum Inhalt darüber, wie die nicht-ready Artikel */
-.round-main > .debts { margin-top: 3rem; border-top: 2px dashed var(--line); }
-.debts-top { margin-bottom: 2rem; }
 
 .side-today-link { display: block; text-decoration: none; color: var(--fg); padding: 10px 12px; }
 .side-today-link h4 { margin: 0 0 2px !important; }
@@ -325,8 +324,9 @@ input[type="checkbox"] { width: auto; flex: none; }
 /* Status-Leiste unter dem Kopf (neben der Sidebar): markant, volle Breite */
 .statusbar:empty { display: none; }
 .status-lines:empty { display: none; }
-.status-lines { display: grid; gap: 3px; }
-.status-flow { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 16px; font-size: 16px; }
+.statusbar:not(:empty), .status-lines:not(:empty) { display: contents; }
+.status-lines > * + * { margin-top: 3px; }
+.status-flow { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 16px; height: var(--flow-h); box-sizing: border-box; overflow: hidden; font-size: 16px; position: sticky; top: var(--top-h); z-index: 4; background: var(--bg); }
 .status-flow .step-sep { color: var(--muted); }
 .status-flow .done { font-weight: 600; color: var(--fg); }
 .status-flow .now { font-weight: 700; background: var(--ok); color: var(--on-ok); padding: 4px 12px; border-radius: 999px; }
@@ -361,13 +361,67 @@ input[type="checkbox"] { width: auto; flex: none; }
 .item-list { gap: 0; }
 .item-list .item-line:nth-child(even), .card table tbody tr:nth-child(even) { background: var(--stripe); }
 .round-link:nth-of-type(even) .card { background: color-mix(in srgb, var(--fg) 4%, var(--surface)); }
-.debts .list { gap: 6px; }
-.debts .list li { padding: 8px 10px; background: var(--stripe); border-radius: 6px; }
-.debts { container-type: inline-size; }
-@container (min-width: 640px) { .debts .list { grid-template-columns: 1fr 1fr; } }
 
 /* Heute-Bestellungen in „Alle Bestellungen“: hervorgehoben, vor der Monatsliste */
 .round-link.today .card { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-color: var(--accent); }
 
 /* Summenzeilen der Sammelbestellung: Bezeichnung rechtsbündig mit Abstand vor dem Wert */
 tfoot td.foot-lbl { text-align: right; padding-right: 1.5rem; }
+
+/* Offene Beträge direkt unter dem Unbezahlt-Hinweis, ohne Karte; zweispaltig wenn breit genug */
+.status-debts { display: grid; gap: 6px; padding: 8px 12px; }
+.debt-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; background: var(--stripe); border-radius: 6px; }
+@media (min-width: 900px) { .status-debts { grid-template-columns: 1fr 1fr; } }
+
+/* Restaurant-Kopf: kräftig abgesetzt */
+.round-head { outline: 8px solid var(--fg); outline-offset: 0; margin: 8px; background: light-dark(#fff, color-mix(in srgb, #000 40%, var(--bg))); }
+.round-head .round-title { margin: 0; font-size: 28px; line-height: 1.2; }
+.round-buyer { margin-left: 12px; font-size: 18px; font-weight: 400; color: var(--muted); }
+
+.ready-strip .strip-sep { margin: 0 8px; opacity: .7; }
+.ready-strip .strip-cur { font-weight: 700; }
+.ready-strip .strip-past { font-weight: 400; }
+
+/* Tabs angedockt an das folgende Panel, zwei Zeilen Abstand darüber; aktiv = Farbe des Panels, passiv = dunkler */
+.round-main > .tabs { margin-top: 0.5rem; margin-bottom: -16px; gap: 4px; position: relative; z-index: 1; }
+.round-main > .tabs button { padding: 10px 6px; border-radius: 10px 10px 0 0; border: 1px solid var(--line); border-bottom: 0; background: light-dark(color-mix(in srgb, #000 20%, var(--surface)), color-mix(in srgb, #000 42%, var(--surface))); color: var(--muted); font-weight: 600; }
+.round-main > .tabs button[aria-selected="true"] { position: relative; z-index: 2; margin-bottom: -1px; padding-bottom: 11px; background: var(--surface); color: var(--fg); font-weight: 700; }
+/* erste Karte unter den Tabs: obere Ecken eckig, damit nirgends ein Spalt entsteht */
+.round-main > .tabs ~ .card, .round-main > .tabs ~ * > .card:first-child { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+/* Tabs beim Scrollen unter dem Kopf festhalten (Kopfhöhe: Desktop 71 px, schmal 108 px) */
+:root { --top-h: 71px; }
+@media (max-width: 899px) { :root { --top-h: 108px; } }
+.round-main > .tabs { position: sticky; top: var(--top-h); z-index: 4; background: var(--bg); }
+
+.qty-cell { font-weight: 700; font-size: 1.2em; }
+.order-table tbody td { vertical-align: baseline; }
+
+/* Tabschrift 20 % größer, aktiver Tab 80 % größer (Höhe ergibt sich nur aus der Schrift) */
+.round-main > .tabs { align-items: flex-end; }
+.round-main > .tabs button { font-size: min(1.2rem, 3.2cqw); flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.round-main > .tabs { container-type: inline-size; }
+.round-main > .tabs button[aria-selected="true"] { font-size: min(1.44rem, 2.56cqw); }
+@media (max-width: 480px) { .round-main > .tabs button { padding-inline: 2px; } }
+
+/* Statuszeile (1) und Tabs (2) haften gemeinsam unter dem Kopf; feste Höhe der Statuszeile je Breite (ein- oder zweizeilig) */
+:root { --flow-h: 49px; }
+@media (min-width: 700px) and (max-width: 833px) { :root { --flow-h: 66px; } }
+.round-main > .tabs { top: calc(var(--top-h) + var(--flow-h)); }
+
+/* Schmal: Statuszeile scrollt mit (zu hoch zum Haften), nur die Tabs haften */
+@media (max-width: 699px) {
+  .status-flow { position: static; height: auto; padding: 8px 16px; overflow: visible; }
+  .round-main > .tabs { top: var(--top-h); }
+}
+
+/* Webseiten-Link als Pille: Schriftfarbe = Hintergrund, Hintergrund = Schriftfarbe */
+.link-pill { display: inline-block; padding: 1px 10px; border-radius: 999px; background: var(--fg); color: var(--bg); text-decoration: none; font-weight: 600; font-size: 0.85em; }
+.order-head { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px 14px; }
+.order-head > h3 { flex: none; }
+.order-head > .row { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; margin-left: auto; justify-content: flex-end; }
+.order-head > .row > span { flex: none; white-space: nowrap; }
+.order-head .link-pill { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 699px) { .order-head { flex-wrap: wrap; } }
+.plain { font-weight: 400; }
+.ext-arrow { display: inline-block; vertical-align: -0.12em; margin-right: 4px; }

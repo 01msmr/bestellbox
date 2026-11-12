@@ -28,6 +28,7 @@ export const DEFAULTS = {
   deadlineMinutes: 20,
   extendMinutes: 5,
   etaMinutes: 40, // vorbelegte geschätzte Lieferzeit
+  nightEndHour: 4, // bis zu dieser Uhrzeit zählt der Abend davor noch als „heute“
 };
 
 /** Listen und Auswertungen. */

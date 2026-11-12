@@ -1,6 +1,7 @@
 // Gemeinsame Helfer des Frontends: DOM-Builder, API, Name, Formatierung.
 import { t, locale } from '/i18n.js';
-import { LIMITS, TIMING } from '/config.js';
+import { LIMITS, TIMING, DEFAULTS } from '/config.js';
+import { isToday } from '/format.js';
 
 export const app = document.getElementById('app');
 const whoBtn = document.getElementById('who');
@@ -16,8 +17,8 @@ export const fmtDay = (ms, year = true) =>
   new Date(ms).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'numeric', ...(year ? { year: 'numeric' } : {}) }).replace(/\.(?=\d)/g, '. ');
 export const fmtDate = (ms) => `${fmtDay(ms)}, ${new Date(ms).toLocaleTimeString(locale, { timeStyle: 'short' })}`;
 export const fmtClock = (ms) => new Date(ms).toLocaleTimeString(locale, { timeStyle: 'short' });
-// Heute: nur Uhrzeit; sonst Datum mit Wochentag + Uhrzeit (mehrere Bestellungen eines Restaurants pro Tag unterscheidbar)
-export const fmtWhen = (ms) => (new Date(ms).toDateString() === new Date().toDateString() ? fmtClock(ms) : `${fmtDay(ms, false)}, ${fmtClock(ms)}`);
+// Heute (bis 4 Uhr nachts noch der Abend davor): nur Uhrzeit; sonst Datum mit Wochentag + Uhrzeit (mehrere Bestellungen eines Restaurants pro Tag unterscheidbar)
+export const fmtWhen = (ms) => (isToday(ms, Date.now(), DEFAULTS.nightEndHour) ? fmtClock(ms) : `${fmtDay(ms, false)}, ${fmtClock(ms)}`);
 export const lc = (s) => String(s ?? '').toLocaleLowerCase('de');
 
 export function h(tag, props, ...kids) {
@@ -101,14 +102,26 @@ export function telHref(p) {
   return d ? 'tel:' + d : null;
 }
 // PayPal-Link mit Betrag (nur für paypal.me-Adressen möglich; E-Mail-Adressen werden nur angezeigt)
-export function contactLinks(r) {
+// Pfeil „öffnet extern“ (nach rechts oben), in Schriftgröße (1em) und Textfarbe
+function extArrow() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', width: '1em', height: '1em', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', class: 'ext-arrow' })) svg.setAttribute(k, v);
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'M6 18L18 6M8 6h10v10');
+  svg.append(path);
+  return svg;
+}
+export function contactLinks(r, { pill = false } = {}) {
   const tel = telHref(r.phone);
   const web = webHref(r.url);
+  const noTel = h('span', { class: 'muted' }, pill ? `(${t('keine Telefonnummer')})` : t('keine Telefonnummer'));
+  const telEl = tel ? (pill ? h('span', null, '(', h('a', { href: tel }, '' + r.phone), ')') : h('a', { href: tel }, '' + r.phone)) : noTel;
   return h(
     'div',
     { class: 'row' },
-    tel ? h('a', { href: tel }, '' + r.phone) : h('span', { class: 'muted' }, t('keine Telefonnummer')),
-    web ? h('a', { href: web, target: '_blank', rel: 'noopener noreferrer' }, '' + r.url.replace(/^https?:\/\//i, '')) : null
+    telEl,
+    web ? h('a', { class: pill ? 'link-pill' : null, title: pill ? r.url : null, href: web, target: '_blank', rel: 'noopener noreferrer' }, ...(pill ? [] : [extArrow()]), '' + r.url.replace(/^https?:\/\//i, '')) : null
   );
 }
 export { fmtRemaining } from '/format.js';

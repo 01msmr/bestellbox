@@ -46,3 +46,9 @@ export function joinList(items, and) {
   if (items.length < 2) return items.join('');
   return `${items.slice(0, -1).join(', ')} ${and} ${items[items.length - 1]}`;
 }
+
+/** „Heute“: gleicher Kalendertag, oder (in der Nacht vor `nightEndHour`) noch der Abend davor. */
+export function isToday(ms, now, nightEndHour) {
+  const key = (t) => `${new Date(t).getFullYear()}-${new Date(t).getMonth()}-${new Date(t).getDate()}`;
+  return key(ms) === key(now) || key(ms - nightEndHour * 3600000) === key(now - nightEndHour * 3600000);
+}

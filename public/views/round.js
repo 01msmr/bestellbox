@@ -24,7 +24,6 @@ export function roundView(id) {
   const usersPane = h('div', { class: 'users-pane' });
   const minePane = h('div', { style: 'display:grid;gap:10px' });
   const orderPane = h('div', { class: 'card' });
-  const debtsCard = h('section', { class: 'card debts' });
   const payCard = h('section', { class: 'card pay hidden' });
   const inEta = h('input', { type: 'number', min: 1, max: LIMITS.etaMaxMinutes, value: DEFAULTS.etaMinutes, inputmode: 'numeric', style: 'width:84px' });
   const etaText = h('div', { style: 'font-weight:600' });
@@ -122,7 +121,7 @@ export function roundView(id) {
   // Mobil untereinander; ab Desktop-Breite: links Tabs, rechts Frist/Banner/Bezahlen (siehe style.css)
   app.classList.add('wide');
   head.classList.add('round-head');
-  const roundMain = h('div', { class: 'round-main' }, tabsEl, usersPane, minePane, orderPane, debtsCard);
+  const roundMain = h('div', { class: 'round-main' }, tabsEl, usersPane, minePane, orderPane);
   const roundGrid = h('div', { class: 'round-grid' }, head, roundMain);
   app.replaceChildren(roundGrid);
   showTab(tab);
@@ -135,7 +134,7 @@ export function roundView(id) {
   function flagBadge(u, flag) {
     const on = u[flag];
     const label = flag === 'done' ? (on ? t('✓ ready') : t('unready')) : on ? t('✓ bezahlt') : t('nicht bezahlt');
-    const cls = on ? 'on' : flag === 'done' ? 'pale' : 'off';
+    const cls = on ? (flag === 'done' && d.ordered_at ? 'idle' : 'on') : flag === 'done' ? 'pale' : 'off'; // nach Bestellt: ready nur noch grau
     const editable = lc(u.user) === lc(me) || (flag === 'paid' && d.viewer.is_buyer);
     if (!editable || flag === 'done') return h('span', { class: `badge ${cls}` }, label); // ready wird nur über den Button gesetzt
     return h('button', { class: `badge ${cls}`, title: t('Umschalten'), onclick: () => toggle(flag, { user: u.user, value: !on }) }, label);
@@ -220,20 +219,12 @@ export function roundView(id) {
 
   function renderHead() {
     headTop.replaceChildren(
-      h('h2', { style: 'margin:0' }, d.restaurant.name, h('span', { class: 'muted', style: 'font-weight:400;margin-left:8px' }, fmtWhen(d.created_at))),
+      h('h2', { class: 'round-title' }, d.restaurant.name, h('span', { class: 'round-buyer' }, d.buyer)),
       contactLinks(d.restaurant),
       ...(d.restaurant.address ? [h('div', { class: 'muted' }, d.restaurant.address)] : [])
     );
     const manage = d.viewer.can_manage;
-    headMeta.replaceChildren(
-      ...(manage
-        ? [t('Gestartet {date} von {creator}', { date: fmtDate(d.created_at), creator: d.creator })]
-        : [
-            t('Gestartet {date} von {creator} · bestellt von ', { date: fmtDate(d.created_at), creator: d.creator }),
-            h('strong', null, d.buyer),
-            t(' · Lieferkosten: {fee}', { fee: eur(d.delivery_fee_cents) }),
-          ])
-    );
+    headMeta.replaceChildren(...(manage || !d.delivery_fee_cents ? [] : [t('Lieferkosten: {fee}', { fee: eur(d.delivery_fee_cents) })]));
     headForm.classList.toggle('hidden', !manage);
     const vals = [d.buyer, d.paypal, (d.delivery_fee_cents / 100).toFixed(2).replace('.', ',')];
     saved = vals;
@@ -322,18 +313,20 @@ export function roundView(id) {
     const step = (cls, text, time) => h('span', { class: `step ${cls}` }, text, time ? [' \u00A0\u00A0', h('span', { class: 'step-time' }, time)] : null);
     const sep = () => h('span', { class: 'step-sep' }, '›');
     const readyTxt = d.ready.total ? t('ready {done}/{total}', { done: d.ready.done, total: d.ready.total }) : t('ready');
-    const opened = step('done', `✓ ${t('eröffnet')}`, fmtClock(d.created_at));
+    const opened = step('done', `✓ ${t('eröffnet')}`, fmtWhen(d.created_at));
     const ordTxt = `✓ ${t('bestellt')}`;
     const flow = d.delivered_at
-      ? [opened, step('done', `✓ ${t('ready')}`), step('done', ordTxt, fmtClock(d.ordered_at)), step('now', `✓ ${t('geliefert')}`, t('{time} Uhr', { time: fmtClock(d.delivered_at) }))]
+      ? [opened, step('done', `✓ ${t('ready')}`), step('done', ordTxt, fmtWhen(d.ordered_at)), step('now', `✓ ${t('geliefert')}`, t('{time} Uhr', { time: fmtWhen(d.delivered_at) }))]
       : d.ordered_at
-        ? [opened, step('done', `✓ ${t('ready')}`), step('now', ordTxt, fmtClock(d.ordered_at)), step('todo', t('geliefert'))]
+        ? [opened, step('done', `✓ ${t('ready')}`), step('now', ordTxt, fmtWhen(d.ordered_at)), step('todo', t('geliefert'))]
         : allReady
           ? [opened, step('now', `✓ ${readyTxt}`), step('todo', t('bestellt')), step('todo', t('geliefert'))]
           : null;
     if (flow) b.push(h('div', { class: 'status-flow' }, ...flow.flatMap((x, n) => (n ? [sep(), x] : [x]))));
     else if (d.ready.total) b.push(h('div', { class: 'banner warn' }, t('Noch nicht alle ready ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
-    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t(d.debts.length === 1 ? '{n} Nutzer hat noch nicht bezahlt: {names} ({sum} offen)' : '{n} Nutzer haben noch nicht bezahlt: {names} ({sum} offen)', { n: d.debts.length, names: joinList(d.debts.map((x) => x.user), t('und')), sum: eur(d.debts_total_cents) })));
+    if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t(d.debts.length === 1 ? '{n} hat noch nicht bezahlt: {names} ({sum} offen)' : '{n} haben noch nicht bezahlt: {names} ({sum} offen)', { n: d.debts.length, names: joinList(d.debts.map((x) => x.user), t('und')), sum: eur(d.debts_total_cents) })));
+    if (d.debts.length) b.push(h('div', { class: 'status-debts' }, ...d.debts.map(debtRow)));
+    else if (d.ordered_at && d.users.some((u) => u.subtotal_cents > 0)) b.push(h('div', { class: 'banner ok' }, t('✓ Alles bezahlt')));
     for (const u of d.pending) {
       b.unshift(h('div', { class: 'banner bad row between' },
         h('span', null, t('Neu: {user} möchte mitbestellen', { user: u })),
@@ -427,6 +420,9 @@ export function roundView(id) {
         delta > 0 ? '+' : '−'
       );
     const closed = locked || mineU.done;
+    // nur Erledigtes: ready › bestellt › geliefert; der aktuell gültige Schritt fett
+    const doneSteps = [t('✓ ready'), ...(d.ordered_at ? [`✓ ${t('bestellt')}`] : []), ...(d.delivered_at ? [`✓ ${t('geliefert')}`] : [])];
+    const doneFlow = doneSteps.flatMap((txt, n) => [...(n ? [h('span', { class: 'strip-sep' }, '›')] : []), h('span', { class: n === doneSteps.length - 1 ? 'strip-cur' : 'strip-past' }, txt)]);
     const money = (c) => (c / 100).toFixed(2).replace('.', ',');
     const priceCell = (c) => h('div', { class: 'price-in' }, h('span', { class: 'num-box' }, money(c)), h('span', { class: 'eur-box' }, '€'));
     const sumRow = (label, cents, cls = '') => h('div', { class: `sum-row ${cls}` }, h('div', { class: 'c-lbl' }, label), h('div', { class: 'c-amt' }, priceCell(cents)));
@@ -439,7 +435,7 @@ export function roundView(id) {
       return h('div', { class: 'item-row item-line' }, qtyCol, col('art', field('article', i.article, LIMITS.article, { required: true })), col('var', field('variant', i.variant || '', LIMITS.variant)), col('price', h('div', { class: 'price-in' }, field('price', money(i.price_cents), 12, { inputmode: 'decimal' }), h('span', { class: 'eur-box' }, '€'))), col('act', del));
     };
     mineList.replaceChildren(
-      h('div', { class: 'ready-strip ' + (mineU.done ? 'on' : 'pale') }, mineU.done ? t('✓ ready') : t('unready – Artikel zählen nicht')),
+      h('div', { class: 'ready-strip ' + (mineU.done ? 'on' : 'pale') }, ...(mineU.done ? doneFlow : [t('unready – Artikel zählen nicht')])),
       h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Meine Artikel')), h('div', { class: 'row' }, lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
       ...(undo ? [h('div', { class: 'row between undo-row' }, h('span', { class: 'muted' }, t('Gelöscht: {name}', { name: undo.item.article })), h('button', { class: 'btn small', type: 'button', onclick: doUndo }, t('Rückgängig')))] : []),
       mineU.items.length
@@ -473,11 +469,13 @@ export function roundView(id) {
   function renderOrder() {
     const tel = telHref(d.restaurant.phone);
     orderPane.replaceChildren(
-      h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Sammelbestellung')), contactLinks(d.restaurant)),
+      h('div', { class: 'order-head' },
+        h('h3', { style: 'margin:0' }, t('Sammelbestellung'), ' ', h('span', { class: 'plain' }, t('bei')), ` ${d.restaurant.name} `, h('span', { class: 'plain' }, t('durch')), ` ${d.buyer}`),
+        contactLinks(d.restaurant, { pill: true })),
       d.groups.length
         ? h(
             'table',
-            { style: 'margin-top:8px' },
+            { class: 'order-table', style: 'margin-top:8px' },
             h('thead', null, h('tr', null, h('th', { class: 'num' }, t('Menge')), h('th', null, t('Artikel')), h('th', { class: 'num' }, t('Einzel')), h('th', { class: 'num' }, t('Summe')))),
             h(
               'tbody',
@@ -486,9 +484,9 @@ export function roundView(id) {
                 h(
                   'tr',
                   null,
-                  h('td', { class: 'num' }, `${g.qty}×`),
+                  h('td', { class: 'num qty-cell' }, `${g.qty}×`),
                   h('td', null, g.article, g.variant ? ` · ${g.variant}` : '', h('div', { class: 'muted' }, g.users.map((x) => (x.qty > 1 ? `${x.user} ${x.qty}×` : x.user)).join(', ')), g.price_differs ? h('div', { class: 'warn-text' }, t('Preis prüfen – zuletzt {p}', { p: eur(g.known_price_cents) })) : null),
-                  h('td', { class: 'num' }, eur(g.price_cents)),
+                  h('td', { class: 'num' }, g.qty > 1 ? eur(g.price_cents) : ''), // bei 1× wäre Einzel = Summe: nur rechts
                   h('td', { class: 'num' }, eur(g.sum_cents))
                 )
               )
@@ -561,8 +559,9 @@ export function roundView(id) {
         )
       );
     }
-    if (isBuyer) rows.push(h('div', { class: 'muted' }, t('Du bist Besteller – die anderen zahlen an dich.')));
-    else if (meU && meU.subtotal_cents > 0 && meU.paid) rows.unshift(h('div', { class: 'ready-strip on' }, t('✓ Du hast bezahlt')));
+    if (isBuyer) {
+      // Besteller zahlt nicht an sich selbst: nur die Adresse zum Kopieren
+    } else if (meU && meU.subtotal_cents > 0 && meU.paid) rows.unshift(h('div', { class: 'ready-strip on' }, t('✓ Du hast bezahlt')));
     else if (meU && meU.subtotal_cents > 0) {
       const href = d.paypal ? payHref(d.paypal, meU.total_cents) : null;
       rows.push(
@@ -575,56 +574,27 @@ export function roundView(id) {
   }
 
   let payConfirm = null; // {user, timer}: Rückfrage im Button vor „bezahlt“
-  function renderDebts() {
-    if (!d.users.some((u) => u.subtotal_cents > 0)) {
-      debtsCard.classList.add('hidden');
-      return;
-    }
-    debtsCard.classList.remove('hidden');
-    const top = !!(d.ordered_at && d.delivered_at); // fertig und geliefert: Beträge oben unter den Hinweisen
-    debtsCard.classList.toggle('debts-top', top);
-    if (top && debtsCard.parentNode !== roundGrid) roundGrid.prepend(debtsCard);
-    else if (!top && debtsCard.parentNode !== roundMain) roundMain.append(debtsCard);
-    debtsCard.replaceChildren(
-      d.debts.length
-        ? h('div', { class: 'ready-strip pale' }, d.locked ? t('Offene Beträge') : t('Offene Beträge (vorläufig)'))
-        : h('div', { class: 'ready-strip on', style: 'margin:-14px' }, t('✓ Alles bezahlt')),
-      d.debts.length
-        ? h(
-            'ul',
-            { class: 'list' },
-            d.debts.map((x) =>
-              h(
-                'li',
-                null,
-                h('span', null, x.user),
-                h(
-                  'span',
-                  { class: 'row' },
-                  h('strong', null, eur(x.amount_cents)),
-                  lc(x.user) === lc(me) || d.viewer.is_buyer
-                    ? h('button', {
-                      class: payConfirm?.user === x.user ? 'btn small' : 'btn small ghost',
-                      onclick: () => {
-                        if (payConfirm?.user === x.user) {
-                          clearTimeout(payConfirm.timer);
-                          payConfirm = null;
-                          toggle('paid', { user: x.user, value: true });
-                          return;
-                        }
-                        clearTimeout(payConfirm?.timer);
-                        payConfirm = { user: x.user, timer: setTimeout(() => { payConfirm = null; renderDebts(); }, TIMING.confirmMs) };
-                        renderDebts();
-                      },
-                    }, payConfirm?.user === x.user ? t('ist bezahlt?') : t('als bezahlt markieren'))
-                    : null
-                )
-              )
-            )
-          )
-        : ''
-    );
-  }
+  const debtRow = (x) =>
+    h('div', { class: 'debt-row' },
+      h('span', null, x.user),
+      h('span', { class: 'row' },
+        h('strong', null, eur(x.amount_cents)),
+        lc(x.user) === lc(me) || d.viewer.is_buyer
+          ? h('button', {
+              class: payConfirm?.user === x.user ? 'btn small' : 'btn small ghost',
+              onclick: () => {
+                if (payConfirm?.user === x.user) {
+                  clearTimeout(payConfirm.timer);
+                  payConfirm = null;
+                  toggle('paid', { user: x.user, value: true });
+                  return;
+                }
+                clearTimeout(payConfirm?.timer);
+                payConfirm = { user: x.user, timer: setTimeout(() => { payConfirm = null; renderBanners(); }, TIMING.confirmMs) };
+                renderBanners();
+              },
+            }, payConfirm?.user === x.user ? t('ist bezahlt?') : t('als bezahlt markieren'))
+          : null));
 
   function updateTimer() {
     if (!d) return;
@@ -667,7 +637,6 @@ export function roundView(id) {
       renderMine();
       renderOrder();
       renderPay();
-      renderDebts();
       updateTimer();
     },
     destroy() {

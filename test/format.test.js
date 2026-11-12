@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtRemaining, genitive, payHref, joinList } from '../public/format.js';
+import { fmtRemaining, genitive, payHref, joinList, isToday } from '../public/format.js';
 import { isCurrentRound } from '../public/group.js';
 
 const MIN = 60000;
@@ -72,4 +72,13 @@ test('joinList: Komma-Liste mit „und“ vor dem letzten Eintrag', () => {
   assert.equal(joinList(['A', 'B'], 'und'), 'A und B');
   assert.equal(joinList(['darkc', 'mister H', 'David'], 'und'), 'darkc, mister H und David');
   assert.equal(joinList(['A', 'B', 'C'], 'and'), 'A, B and C');
+});
+
+test('isToday: heute, und in der Nacht bis 4 Uhr noch der Abend davor', () => {
+  const at = (d, h, m = 0) => new Date(2026, 10, d, h, m).getTime();
+  assert.equal(isToday(at(12, 19, 49), at(12, 21), 4), true, 'gleicher Tag');
+  assert.equal(isToday(at(12, 1, 3), at(12, 21), 4), true, 'heute nach Mitternacht');
+  assert.equal(isToday(at(12, 19, 49), at(13, 2), 4), true, 'Nacht nach dem Abend');
+  assert.equal(isToday(at(12, 19, 49), at(13, 5), 4), false, 'nach 4 Uhr ist es gestern');
+  assert.equal(isToday(at(11, 12), at(12, 10), 4), false, 'gestern');
 });
