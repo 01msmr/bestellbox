@@ -550,7 +550,7 @@ export function roundView(id) {
       );
     }
     if (isBuyer) rows.push(h('div', { class: 'muted' }, t('Du bist Besteller – die anderen zahlen an dich.')));
-    else if (meU && meU.subtotal_cents > 0 && meU.paid) rows.push(h('div', { class: 'banner ok' }, t('✓ Du hast bezahlt')));
+    else if (meU && meU.subtotal_cents > 0 && meU.paid) rows.unshift(h('div', { class: 'ready-strip on' }, t('✓ Du hast bezahlt')));
     else if (meU && meU.subtotal_cents > 0) {
       const href = d.paypal ? payHref(d.paypal, meU.total_cents) : null;
       rows.push(
@@ -569,7 +569,9 @@ export function roundView(id) {
     }
     debtsCard.classList.remove('hidden');
     debtsCard.replaceChildren(
-      h('h3', null, d.locked ? t('Offene Beträge') : t('Offene Beträge (vorläufig)')),
+      d.debts.length
+        ? h('div', { class: 'ready-strip pale' }, d.locked ? t('Offene Beträge') : t('Offene Beträge (vorläufig)'))
+        : h('div', { class: 'ready-strip on', style: 'margin:-14px' }, t('✓ Alles bezahlt')),
       d.debts.length
         ? h(
             'ul',
@@ -590,7 +592,7 @@ export function roundView(id) {
               )
             )
           )
-        : h('div', { class: 'banner ok' }, t('✓ Alles bezahlt'))
+        : ''
     );
   }
 
