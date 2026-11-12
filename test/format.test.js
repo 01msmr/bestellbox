@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtRemaining, genitive, payHref, joinList, isToday } from '../public/format.js';
+import { fmtRemaining, genitive, payHref, joinList, isToday, centsToInput } from '../public/format.js';
 import { isCurrentRound } from '../public/group.js';
 
 const MIN = 60000;
@@ -81,4 +81,12 @@ test('isToday: heute, und in der Nacht bis 4 Uhr noch der Abend davor', () => {
   assert.equal(isToday(at(12, 19, 49), at(13, 2), 4), true, 'Nacht nach dem Abend');
   assert.equal(isToday(at(12, 19, 49), at(13, 5), 4), false, 'nach 4 Uhr ist es gestern');
   assert.equal(isToday(at(11, 12), at(12, 10), 4), false, 'gestern');
+});
+
+test('centsToInput: Cent als Eingabetext mit Komma', () => {
+  assert.equal(centsToInput(1300), '13,00');
+  assert.equal(centsToInput(5), '0,05');
+  assert.equal(centsToInput(0), '0,00');
+  assert.equal(centsToInput(9950), '99,50');
+  assert.equal(centsToInput(1300, '.'), '13.00', 'Dezimalzeichen wählbar (Englisch)');
 });

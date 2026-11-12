@@ -52,3 +52,6 @@ export function isToday(ms, now, nightEndHour) {
   const key = (t) => `${new Date(t).getFullYear()}-${new Date(t).getMonth()}-${new Date(t).getDate()}`;
   return key(ms) === key(now) || key(ms - nightEndHour * 3600000) === key(now - nightEndHour * 3600000);
 }
+
+/** Cent als Eingabetext („1300“ → „13,00“); Dezimalzeichen je Sprache wählbar. */
+export const centsToInput = (cents, decimal = ',') => (cents / 100).toFixed(2).replace('.', decimal);

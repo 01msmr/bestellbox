@@ -4,7 +4,7 @@ import { app, eur, h, api, act, nav } from '/util.js';
 
 export function statsView() {
   let scope = sessionStorage.getItem('bb_scope') || 'last30';
-  const body = h('div', { style: 'display:grid;gap:14px' });
+  const body = h('div', { class: 'stack-6' });
   const scopeBtns = h('div', { class: 'tabs' });
   for (const [k, label] of [
     ['last30', t('Letzte 30 Bestellungen')],
@@ -42,7 +42,7 @@ export function statsView() {
     t('Export (JSON)')
   );
   api('GET', '/me').then((m) => exportBtn.classList.toggle('hidden', !m.is_admin)).catch(() => {});
-  app.replaceChildren(h('div', { class: 'row between' }, h('h2', { style: 'margin:0' }, t('Statistik')), exportBtn), scopeBtns, body);
+  app.replaceChildren(h('div', { class: 'row between' }, h('h2', { class: 'flush' }, t('Statistik')), exportBtn), scopeBtns, body);
 
   return {
     async refresh() {
@@ -56,7 +56,7 @@ export function statsView() {
       body.replaceChildren(
         h(
           'section',
-          { class: 'card grid3', style: 'grid-template-columns:1fr 1fr 1fr' },
+          { class: 'card grid3 grid3-even' },
           h('div', null, h('div', { class: 'muted' }, t('Bestellungen')), h('strong', null, String(s.rounds))),
           h('div', null, h('div', { class: 'muted' }, t('Ø Preis Artikel')), h('strong', null, eur(s.avg_item_cents))),
           h('div', null, h('div', { class: 'muted' }, t('Ø Betrag/User')), h('strong', null, eur(s.avg_order_cents)))

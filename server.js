@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openDb, createLogic, HttpError } from './db.js';
+import { SECURITY_HEADERS } from './security.js';
 import { LIMITS, TIMING } from './public/config.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -142,12 +143,15 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
     throw new HttpError(404, 'Nicht gefunden');
   }
 
+  const startVersion = String(Date.now());
+
   async function serveStatic(res, pathname) {
     const rel = pathname === '/' ? 'index.html' : pathname.slice(1);
     const file = path.normalize(path.join(PUBLIC, rel));
     if (!file.startsWith(PUBLIC + path.sep)) throw new HttpError(404, 'Nicht gefunden');
     try {
-      const data = await readFile(file);
+      let data = await readFile(file);
+      if (path.basename(file) === 'index.html') data = Buffer.from(data.toString('utf8').replaceAll('__VERSION__', startVersion)); // Cache-Version = Startzeit des Servers
       res.writeHead(200, { 'content-type': MIME[path.extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-cache' });
       res.end(data);
     } catch {
@@ -156,6 +160,7 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
   }
 
   const server = http.createServer(async (req, res) => {
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
     try {
       const url = new URL(req.url, 'http://localhost');
       if (url.pathname.startsWith('/api/')) await api(req, res, url);

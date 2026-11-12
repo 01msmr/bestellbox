@@ -549,3 +549,33 @@ test('Nach dem Schließen kann niemand „ready“ zurücknehmen (Artikel änder
     await close();
   }
 });
+
+test('Sicherheits- und Cache-Header auf Seiten und API', async () => {
+  const { server, close } = await boot();
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    for (const url of ['/', '/style.css', '/api/rounds']) {
+      const res = await fetch(base + url, { headers: { 'x-user': 'alex' } });
+      assert.equal(res.headers.get('x-content-type-options'), 'nosniff', url);
+      assert.equal(res.headers.get('referrer-policy'), 'no-referrer', url);
+      assert.equal(res.headers.get('x-frame-options'), 'DENY', url);
+      const csp = res.headers.get('content-security-policy') ?? '';
+      assert.ok(csp.includes("default-src 'self'") && csp.includes("frame-ancestors 'none'") && csp.includes("script-src 'self'"), `CSP ${url}`);
+      await res.arrayBuffer();
+    }
+    assert.equal((await fetch(base + '/style.css')).headers.get('cache-control'), 'no-cache');
+  } finally {
+    await close();
+  }
+});
+
+test('index.html: Cache-Version (?v=) an Stylesheet und Skripten', async () => {
+  const { server, close } = await boot();
+  try {
+    const html = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).text();
+    for (const f of ['style.css', 'theme.js', 'i18n.js', 'app.js']) assert.match(html, new RegExp(`/${f.replace('.', '\\.')}\\?v=\\d+`), f);
+    assert.ok(!html.includes('__VERSION__'));
+  } finally {
+    await close();
+  }
+});

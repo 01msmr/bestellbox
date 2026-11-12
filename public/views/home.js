@@ -3,7 +3,7 @@ import { t } from '/i18n.js';
 import { LIMITS, DEFAULTS } from '/config.js';
 import { pendingRound } from '/group.js';
 import { tickCountdowns } from '/side.js';
-import { app, eur, fmtDate, lc, h, api, act, me, parseMoney } from '/util.js';
+import { app, eur, fmtDate, lc, h, api, act, me, parseMoney, money } from '/util.js';
 
 export const roundItem = (r, highlight = false) => {
   const status = r.ordered
@@ -16,7 +16,7 @@ export const roundItem = (r, highlight = false) => {
     { class: 'round-link' + (highlight === true ? ' today' : ''), href: `#/r/${r.id}` },
     h(
       'div',
-      { class: 'card', style: 'padding:10px' },
+      { class: 'card pad-4' },
       h('div', { class: 'row between' }, h('strong', null, r.restaurant), status),
       h('div', { class: 'muted' }, `${fmtDate(r.created_at)} · ${r.creator} · ${t('bestellt von')} ${r.buyer}`),
       h(
@@ -49,7 +49,7 @@ export function homeView() {
       f.url.value = r.url;
       f.phone.value = r.phone;
       f.address.value = r.address ?? '';
-      if (!f.fee.value && r.last_delivery_fee_cents) f.fee.value = (r.last_delivery_fee_cents / 100).toFixed(2).replace('.', ',');
+      if (!f.fee.value && r.last_delivery_fee_cents) f.fee.value = money(r.last_delivery_fee_cents);
     }
   });
   api('GET', '/me/paypal').then((r) => {
@@ -109,10 +109,10 @@ export function homeView() {
     h('label', null, t('Bestellt von'), f.buyer),
     h('label', null, t('PayPal (Adresse/Link)'), f.paypal),
     h('label', null, t('Frist (Minuten)'), f.minutes),
-    h('div', { class: 'form-actions', style: 'gap:12px' }, blockReason, startBtn)
+    h('div', { class: 'form-actions gap-5' }, blockReason, startBtn)
   );
 
-  const head = h('section', { class: 'card' }, h('h2', { style: 'margin:0 0 10px' }, t('Neue Bestellung')), form);
+  const head = h('section', { class: 'card' }, h('h2', { class: 'flush mb-4' }, t('Neue Bestellung')), form);
   app.classList.add('wide');
   app.replaceChildren(h('div', { class: 'round-grid' }, head));
 

@@ -1,7 +1,10 @@
 // Gemeinsame Helfer des Frontends: DOM-Builder, API, Name, Formatierung.
-import { t, locale } from '/i18n.js';
+import { t, locale, lang } from '/i18n.js';
 import { LIMITS, TIMING, DEFAULTS } from '/config.js';
-import { isToday } from '/format.js';
+import { isToday, centsToInput } from '/format.js';
+
+// Betrag als Zahl (ohne €) im Dezimalzeichen der Sprache: de 9,00 · en 9.00
+export const money = (c) => centsToInput(c, lang === 'en' ? '.' : ',');
 
 export const app = document.getElementById('app');
 const whoBtn = document.getElementById('who');
@@ -88,8 +91,21 @@ export function setMe(name, { guest = false } = {}) {
     sessionStorage.removeItem('bb_guest');
     localStorage.setItem('bb_user', me);
   }
-  whoBtn.textContent = me ? `${me}${guest ? ` (${t('dieser Tab')})` : ''}` : t('Name wählen');
+  whoBtn.replaceChildren(userIcon(), me ? `${me}${guest ? ` (${t('dieser Tab')})` : ''}` : t('Name wählen'));
   whoBtn.classList.toggle('guest', guest);
+}
+
+// Einfaches Personen-Symbol (Kopf und Schultern) in Schriftgröße und Textfarbe
+function userIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', width: '1em', height: '1em', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', class: 'user-icon' })) svg.setAttribute(k, v);
+  const head = document.createElementNS(ns, 'circle');
+  for (const [k, v] of Object.entries({ cx: '12', cy: '8', r: '4' })) head.setAttribute(k, v);
+  const body = document.createElementNS(ns, 'path');
+  body.setAttribute('d', 'M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7');
+  svg.append(head, body);
+  return svg;
 }
 
 // ---------- Helpers ----------
@@ -112,7 +128,7 @@ function extArrow() {
   svg.append(path);
   return svg;
 }
-export function contactLinks(r, { pill = false } = {}) {
+export function contactLinks(r, { pill = false, linkPill = false } = {}) {
   const tel = telHref(r.phone);
   const web = webHref(r.url);
   const noTel = h('span', { class: 'muted' }, pill ? `(${t('keine Telefonnummer')})` : t('keine Telefonnummer'));
@@ -121,7 +137,7 @@ export function contactLinks(r, { pill = false } = {}) {
     'div',
     { class: 'row' },
     telEl,
-    web ? h('a', { class: pill ? 'link-pill' : null, title: pill ? r.url : null, href: web, target: '_blank', rel: 'noopener noreferrer' }, ...(pill ? [] : [extArrow()]), '' + r.url.replace(/^https?:\/\//i, '')) : null
+    web ? h('a', { class: pill ? 'link-pill' : linkPill ? 'link-pill colored' : null, title: pill || linkPill ? r.url : null, href: web, target: '_blank', rel: 'noopener noreferrer' }, ...(pill ? [] : [extArrow()]), '' + r.url.replace(/^https?:\/\//i, '')) : null
   );
 }
 export { fmtRemaining } from '/format.js';

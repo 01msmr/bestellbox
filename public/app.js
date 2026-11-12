@@ -36,7 +36,7 @@ function askName() {
       h('div', { class: 'grow' }, input, known),
       h(
         'div',
-        { class: 'form-actions', style: 'margin-top:10px; gap:8px; flex-wrap:wrap' },
+        { class: 'form-actions mt-4 gap-3 wrap' },
         isGuest && homeName()
           ? h('button', { class: 'btn ghost', type: 'button', onclick: () => { setMe(homeName()); resolve(); } }, `${t('Zurück zu')} ${homeName()}`)
           : null,
