@@ -135,7 +135,7 @@ const EN = {
     'Ready = your order is complete. Paid = you have given the buyer your money.',
   // Bestellen
   'Sammelbestellung': 'Combined order',
-  'Einzel': 'Each',
+  'Einzelpreis': 'Unit price',
   'Summe': 'Total',
   'Summe Artikel': 'Items total',
   'Bestellung': 'Order',

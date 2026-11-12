@@ -19,7 +19,7 @@ export function orderContent(d) {
       ? h(
           'table',
           { class: 'order-table mt-3' },
-          h('thead', null, h('tr', null, h('th', { class: 'num' }, t('Menge')), h('th', null, t('Artikel')), h('th', { class: 'num' }, t('Einzel')), h('th', { class: 'num' }, t('Summe')))),
+          h('thead', null, h('tr', null, h('th', { class: 'num' }, t('Menge')), h('th', null, t('Artikel')), h('th', { class: 'num' }, t('Einzelpreis')), h('th', { class: 'num' }, t('Summe')))),
           h(
             'tbody',
             null,
