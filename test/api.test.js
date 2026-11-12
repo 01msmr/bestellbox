@@ -531,3 +531,21 @@ test('Ab „Bestellt“: Bestellkopf (Besteller, PayPal, Lieferkosten) nicht meh
     await close();
   }
 });
+
+test('Nach dem Schließen kann niemand „ready“ zurücknehmen (Artikel ändern nicht mehr möglich)', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'alex', { restaurant: { name: 'Pizza' }, minutes: 20 })).body;
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cola', price: '2' });
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    assert.equal((await call('POST', `/api/rounds/${id}/done`, 'anna', { value: false })).status, 200, 'offen: zurücknehmen erlaubt');
+    await call('POST', `/api/rounds/${id}/done`, 'anna', { value: true });
+    await call('POST', `/api/rounds/${id}/time`, 'alex', { action: 'lock' });
+    assert.equal((await call('POST', `/api/rounds/${id}/done`, 'anna', { value: false })).status, 423, 'geschlossen: nicht mehr');
+    const d = (await call('GET', `/api/rounds/${id}`, 'anna')).body;
+    assert.equal(d.users.find((u) => u.user === 'anna').done, true);
+    assert.equal(d.items_total_cents, 200, 'Artikel zählen weiter');
+  } finally {
+    await close();
+  }
+});

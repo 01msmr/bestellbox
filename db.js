@@ -390,6 +390,7 @@ export function createLogic(db, { admins = [] } = {}) {
     if (flag === 'done' && !self) throw new HttpError(403, 'Nur du selbst kannst deine Artikel als ready bestätigen');
     if (!self && !isBuyer(r, user)) throw new HttpError(403, 'Bezahlt setzt nur der User selbst oder der Besteller');
     const value = body.value ? 1 : 0;
+    if (flag === 'done' && !value && isLocked(r, Date.now())) throw new HttpError(423, 'Bestellung ist geschlossen');
     if (r.ordered_at && !q.partGet.get(r.id, target)?.approved) throw new HttpError(423, 'Bestellt – keine neuen User mehr');
     if (self) admit(r, target);
     q.partUpsert.run(r.id, target);

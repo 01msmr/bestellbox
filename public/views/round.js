@@ -454,7 +454,7 @@ export function roundView(id) {
         'div',
         { class: 'ready-bar' + (mineU.done ? ' is-done' : '') },
         mineU.done ? h('span', null, t('✓ Ready')) : null,
-        h('button', { class: 'btn ready', type: 'button', onclick: () => toggle('done', { user: mineU.user, value: !mineU.done }) }, mineU.done ? t('Artikel ändern') : t('✓ Ich bin ready'))
+        mineU.done && locked ? null : h('button', { class: 'btn ready', type: 'button', onclick: () => toggle('done', { user: mineU.user, value: !mineU.done }) }, mineU.done ? t('Artikel ändern') : t('✓ Ich bin ready'))
       )
     );
   }
