@@ -2,6 +2,7 @@
 import { t } from '/i18n.js';
 import { eur, h, toast, lc, me } from '/util.js';
 import { payHref } from '/format.js';
+import { qrIcon } from './qr-icon.js';
 
 export function payRows(d) {
   const hasOrders = d.users.some((u) => u.subtotal_cents > 0);
@@ -44,7 +45,7 @@ export function payRows(d) {
     const href = d.paypal ? payHref(d.paypal, meU.total_cents) : null;
     rows.push(
       href
-        ? h('a', { class: 'btn', href, target: '_blank', rel: 'noopener noreferrer' }, t('{amount} per PayPal zahlen', { amount: eur(meU.total_cents) }))
+        ? h('div', { class: 'row pay-row' }, qrIcon(href), h('a', { class: 'btn grow', href, target: '_blank', rel: 'noopener noreferrer' }, t('{amount} per PayPal zahlen', { amount: eur(meU.total_cents) })))
         : h('div', { class: 'muted' }, t('Dein Betrag: {amount}', { amount: eur(meU.total_cents) }))
     );
   }

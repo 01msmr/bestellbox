@@ -11,47 +11,61 @@ import { statsView } from '/views/stats.js';
 import { allView } from '/views/all.js';
 
 const whoBtn = document.getElementById('who');
+const whoWrap = whoBtn.parentElement;
 
-function askName() {
+function askName(overlay = false) {
   return new Promise((resolve) => {
     const known = h('datalist', { id: 'known-users' });
     api('GET', '/users').then((n) => known.replaceChildren(...n.map((x) => h('option', { value: x })))).catch(() => {});
     const input = h('input', { placeholder: t('Dein Name'), maxlength: LIMITS.userName, autofocus: true, value: me, list: 'known-users', autocomplete: 'off' });
+    const close = () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', onKey);
+      form.remove();
+    };
+    const outside = (e) => { if (!whoWrap.contains(e.target)) { close(); resolve(false); } };
+    const onKey = (e) => { if (e.key === 'Escape') { close(); resolve(false); } };
     const done = (guest) => {
       if (!input.value.trim()) return input.focus();
       setMe(input.value, { guest });
-      resolve();
+      if (overlay) close();
+      resolve(true);
     };
     const form = h(
       'form',
       {
-        class: 'card',
+        class: overlay ? 'card name-pop' : 'card',
         onsubmit: (e) => {
           e.preventDefault();
           done(false);
         },
       },
+      overlay ? h('span', { class: 'name-pop-arrow', 'aria-hidden': 'true' }) : null,
       h('h2', null, t('Wie heißt du?')),
-      h('p', { class: 'muted' }, t('Der Name erscheint bei deinen Positionen. Gleicher Name = gleiche Person, bitte konsistent verwenden.')),
+      h('p', { class: 'muted' }, t('Gleicher Name = gleiche Person.')),
       h('div', { class: 'grow' }, input, known),
       h(
         'div',
         { class: 'form-actions mt-4 gap-3 wrap' },
         isGuest && homeName()
-          ? h('button', { class: 'btn ghost', type: 'button', onclick: () => { setMe(homeName()); resolve(); } }, `${t('Zurück zu')} ${homeName()}`)
+          ? h('button', { class: 'btn ghost', type: 'button', onclick: () => { setMe(homeName()); if (overlay) close(); resolve(true); } }, `${t('Zurück zu')} ${homeName()}`)
           : null,
-        h('button', { class: 'btn ghost', type: 'button', title: t('Name gilt nur in diesem Tab, der gespeicherte Name des Rechners bleibt'), onclick: () => done(true) }, t('Nur in diesem Tab')),
+        h('button', { class: 'btn ghost', type: 'button', title: t('Name gilt nur in diesem Tab, der gespeicherte Name des Rechners bleibt'), onclick: () => done(true) }, t('Als Gast')),
         h('button', { class: 'btn', type: 'submit' }, t('Los'))
       )
     );
-    app.replaceChildren(form);
+    if (overlay) {
+      whoWrap.append(form);
+      document.addEventListener('pointerdown', outside, true);
+      document.addEventListener('keydown', onKey);
+    } else app.replaceChildren(form);
     input.focus();
   });
 }
 
 whoBtn.addEventListener('click', async () => {
-  await askName();
-  route();
+  if (whoWrap.querySelector('.name-pop')) return;
+  if (await askName(true)) route();
 });
 
 // ---------- Router ----------

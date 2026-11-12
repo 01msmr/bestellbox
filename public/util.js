@@ -91,7 +91,7 @@ export function setMe(name, { guest = false } = {}) {
     sessionStorage.removeItem('bb_guest');
     localStorage.setItem('bb_user', me);
   }
-  whoBtn.replaceChildren(userIcon(), me ? `${me}${guest ? ` (${t('dieser Tab')})` : ''}` : t('Name wählen'));
+  whoBtn.replaceChildren(userIcon(), me ? `${me}${guest ? ` (${t('als Gast')})` : ''}` : t('Name wählen'));
   whoBtn.classList.toggle('guest', guest);
 }
 

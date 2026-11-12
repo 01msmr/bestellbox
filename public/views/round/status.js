@@ -39,7 +39,7 @@ export function createStatus({ banners, toggle, decide }) {
     const opened = step('done', `✓ ${t('eröffnet')}`, fmtWhen(d.created_at));
     const ordTxt = `✓ ${t('bestellt')}`;
     const flow = d.delivered_at
-      ? [opened, step('done', `✓ ${t('ready')}`), step('done', ordTxt, fmtWhen(d.ordered_at)), step('now', `✓ ${t('geliefert')}`, t('{time} Uhr', { time: fmtWhen(d.delivered_at) }))]
+      ? [opened, step('done', `✓ ${t('ready')}`), step('done', ordTxt, fmtWhen(d.ordered_at)), step('now', `✓ ${t('geliefert')}`, fmtWhen(d.delivered_at))]
       : d.ordered_at
         ? [opened, step('done', `✓ ${t('ready')}`), step('now', ordTxt, fmtWhen(d.ordered_at)), step('todo', t('geliefert'))]
         : allReady
