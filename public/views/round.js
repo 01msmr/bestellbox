@@ -97,11 +97,12 @@ export function roundView(id) {
     },
     h('h3', null, t('+ Artikel')),
     h('div', { class: 'item-row item-labels muted' }, col('qty', t('Menge')), col('art', t('Artikel')), col('var', t('Variante (optional)')), col('price', t('Preis')), col('act')),
-    h('div', { class: 'item-row' }, col('qty', inQty), col('art', inArticle), col('var', inVariant), col('price', h('div', { class: 'price-in' }, inPrice, h('span', null, '€'))), col('act', addBtn)),
+    h('div', { class: 'item-row' }, col('qty', inQty), col('art', inArticle), col('var', inVariant), col('price', h('div', { class: 'price-in' }, inPrice, h('span', { class: 'eur-box' }, '€'))), col('act', addBtn)),
     sugBox,
     h('div', { class: 'price-hint' }, h('strong', null, t('Preise selbst prüfen. ')), t('Vorgeschlagene Preise stammen aus früheren Bestellungen und können veraltet sein.'))
   );
   const mineList = h('div', { class: 'card item-card mine-card' });
+  mineList.addEventListener('focusout', () => { if (mineDeferred) setTimeout(renderMine, 0); });
   minePane.append(addForm, mineList);
 
   const panes = { users: usersPane, mine: minePane, order: orderPane };
@@ -381,7 +382,22 @@ export function roundView(id) {
     );
   }
 
+  let undo = null;
+  function showUndo(item) {
+    clearTimeout(undo?.timer);
+    undo = { item, timer: setTimeout(() => { undo = null; renderMine(); }, TIMING.undoMs) };
+  }
+  async function doUndo() {
+    const { item } = undo;
+    clearTimeout(undo.timer);
+    undo = null;
+    await act(() => api('POST', `/rounds/${id}/items`, { article: item.article, variant: item.variant, price: item.price_cents / 100, qty: item.qty }));
+    nav.current.refresh();
+  }
+  let mineDeferred = false;
   function renderMine() {
+    if (mineList.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') { mineDeferred = true; return; }
+    mineDeferred = false;
     const locked = d.locked;
     for (const el of [inArticle, inVariant, inPrice, inQty, addBtn]) el.disabled = locked;
     const mineU = d.users.find((u) => lc(u.user) === lc(me));
@@ -394,7 +410,7 @@ export function roundView(id) {
         'button',
         {
           class: 'btn small ghost',
-          disabled: locked || i.qty + delta < LIMITS.qtyMin || i.qty + delta > LIMITS.qtyMax,
+          disabled: locked || mineU.done || i.qty + delta < LIMITS.qtyMin || i.qty + delta > LIMITS.qtyMax,
           onclick: async () => {
             await act(() => api('PATCH', `/items/${i.id}`, { qty: i.qty + delta }));
             nav.current.refresh();
@@ -402,47 +418,33 @@ export function roundView(id) {
         },
         delta > 0 ? '+' : '−'
       );
+    const closed = locked || mineU.done;
+    const money = (c) => (c / 100).toFixed(2).replace('.', ',');
+    const priceCell = (c) => h('div', { class: 'price-in' }, h('span', { class: 'num-box' }, money(c)), h('span', { class: 'eur-box' }, '€'));
+    const sumRow = (label, cents, cls = '') => h('div', { class: `sum-row ${cls}` }, h('div', { class: 'c-lbl' }, label), h('div', { class: 'c-amt' }, priceCell(cents)));
+    const counted = d.users.filter((u) => u.subtotal_cents > 0).length;
+    const itemRow = (i) => {
+      const qtyCol = col('qty', h('div', { class: 'row', style: 'flex-wrap:nowrap;gap:4px' }, stepper(i, -1), h('strong', null, String(i.qty)), stepper(i, 1)));
+      const del = h('button', { class: 'btn small danger', disabled: closed, title: t('Entfernen'), onclick: async () => { if ((await act(() => api('DELETE', `/items/${i.id}`))) !== null) showUndo(i); nav.current.refresh(); } }, '✕');
+      if (closed) return h('div', { class: 'item-row item-line' }, qtyCol, col('art', i.article), col('var', h('span', { class: 'muted' }, i.variant)), col('price', priceCell(i.price_cents)));
+      const field = (key, value, max, extra) => h('input', { value, maxlength: max, autocomplete: 'off', ...extra, onchange: async (e) => { await act(() => api('PATCH', `/items/${i.id}`, { [key]: e.target.value })); nav.current.refresh(); } });
+      return h('div', { class: 'item-row item-line' }, qtyCol, col('art', field('article', i.article, LIMITS.article, { required: true })), col('var', field('variant', i.variant || '', LIMITS.variant)), col('price', h('div', { class: 'price-in' }, field('price', money(i.price_cents), 12, { inputmode: 'decimal' }), h('span', { class: 'eur-box' }, '€'))), col('act', del));
+    };
     mineList.replaceChildren(
       h('div', { class: 'ready-strip ' + (mineU.done ? 'on' : 'pale') }, mineU.done ? t('✓ ready') : t('unready – Artikel zählen nicht')),
       h('div', { class: 'row between' }, h('h3', { style: 'margin:0' }, t('Meine Artikel')), h('div', { class: 'row' }, lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
+      ...(undo ? [h('div', { class: 'row between undo-row' }, h('span', { class: 'muted' }, t('Gelöscht: {name}', { name: undo.item.article })), h('button', { class: 'btn small', type: 'button', onclick: doUndo }, t('Rückgängig')))] : []),
       mineU.items.length
         ? h(
             'div',
             { class: 'item-list' },
-            mineU.items.map((i) =>
-              h(
-                'div',
-                { class: 'item-row item-line' },
-                col('qty', h('div', { class: 'row', style: 'flex-wrap:nowrap;gap:4px' }, stepper(i, -1), h('strong', null, String(i.qty)), stepper(i, 1))),
-                col('art', i.article),
-                col('var', h('span', { class: 'muted' }, i.variant)),
-                col('price', eur(i.price_cents)),
-                col(
-                  'act',
-                  h(
-                    'button',
-                    {
-                      class: 'btn small danger',
-                      disabled: locked,
-                      title: t('Entfernen'),
-                      onclick: async () => {
-                        await act(() => api('DELETE', `/items/${i.id}`));
-                        nav.current.refresh();
-                      },
-                    },
-                    '✕'
-                  )
-                )
-              )
-            )
+            mineU.items.map(itemRow)
           )
         : h('div', { class: 'muted' }, t('Noch nichts eingetragen.')),
-      h(
-        'div',
-        { class: 'row between', style: 'margin-top:8px' },
-        h('span', { class: 'muted' }, `${t('Artikel')} ${eur(mineU.subtotal_cents)}${mineU.fee_cents ? ` + ${t('Lieferanteil')} ${eur(mineU.fee_cents)}` : ''}`),
-        h('strong', null, `${t('Summe')} ${eur(mineU.total_cents)}`)
-      ),
+      h('div', { style: 'margin-top:10px;display:grid;gap:4px' },
+        sumRow(t('Summe Artikel'), mineU.subtotal_cents),
+        mineU.fee_cents ? sumRow(`${t('Lieferanteil')} (${t('{fee} / {n} Besteller', { fee: eur(d.delivery_fee_cents), n: counted })})`, mineU.fee_cents) : null,
+        sumRow(t('Summe'), mineU.total_cents, 'total')),
       h('div', { class: 'row', style: 'margin-top:8px' }, h('span', { class: 'muted' }, t('Ready = deine Bestellung ist komplett. Bezahlt = du hast dem Besteller dein Geld gegeben.'))),
       h(
         'div',

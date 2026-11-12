@@ -411,3 +411,48 @@ test('„Schließen, wenn alle ready“ nur bei offener Runde änderbar', async 
     await close();
   }
 });
+
+test('Eigene Position inhaltlich ändern: Name, Beigabe, Preis; Fremde/Ungültiges abgelehnt', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Pizza' }, delivery_fee: '0', minutes: 20 })).body;
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Pizza', price: '8,00', qty: 2 });
+    let d = (await call('GET', `/api/rounds/${id}`, 'anna')).body;
+    const item = d.users.find((u) => u.user === 'anna').items[0];
+    const r = await call('PATCH', `/api/items/${item.id}`, 'anna', { article: 'Diavola', variant: '32 cm', price: '9,50' });
+    assert.equal(r.status, 200);
+    d = (await call('GET', `/api/rounds/${id}`, 'anna')).body;
+    const changed = d.users.find((u) => u.user === 'anna').items[0];
+    assert.deepEqual([changed.article, changed.variant, changed.price_cents, changed.qty], ['Diavola', '32 cm', 950, 2]);
+    assert.equal(d.items_total_cents, 1900);
+    assert.equal((await call('PATCH', `/api/items/${item.id}`, 'uli', { article: 'X' })).status, 403);
+    assert.equal((await call('PATCH', `/api/items/${item.id}`, 'anna', { article: '' })).status, 400);
+    assert.equal((await call('PATCH', `/api/items/${item.id}`, 'anna', { price: '-1' })).status, 400);
+  } finally {
+    await close();
+  }
+});
+
+test('Lieferkosten werden gleichmäßig auf alle Besteller verteilt, nicht nach Artikelwert', async () => {
+  const { call, close } = await boot();
+  try {
+    const { id } = (await call('POST', '/api/rounds', 'uli', { restaurant: { name: 'Pizza' }, delivery_fee: '3,00', minutes: 20 })).body;
+    await call('POST', `/api/rounds/${id}/items`, 'uli', { article: 'Pizza', price: '14', qty: 1 });
+    await call('POST', `/api/rounds/${id}/items`, 'anna', { article: 'Cola', price: '2', qty: 1 });
+    await call('POST', `/api/rounds/${id}/items`, 'bob', { article: 'Pizza', price: '10', qty: 1 });
+    await call('POST', `/api/rounds/${id}/items`, 'clara', { article: 'Tiramisu', price: '5', qty: 1 });
+    let d = (await call('GET', `/api/rounds/${id}`, 'uli')).body;
+    assert.deepEqual(d.users.map((u) => u.fee_cents), [75, 75, 75, 75], '3,00 € / 4 = 0,75 €');
+    assert.equal(d.users.find((u) => u.user === 'anna').total_cents, 275);
+    // 1,00 € auf 3 Besteller: Cent-Rest deterministisch, Summe stimmt
+    await call('PATCH', `/api/rounds/${id}`, 'uli', { delivery_fee: '1,00' });
+    await call('DELETE', `/api/items/${d.users.find((u) => u.user === 'clara').items[0].id}`, 'clara');
+    d = (await call('GET', `/api/rounds/${id}`, 'uli')).body;
+    const fees = d.users.filter((u) => u.subtotal_cents > 0).map((u) => u.fee_cents);
+    assert.equal(fees.length, 3);
+    assert.equal(fees.reduce((a, b) => a + b, 0), 100);
+    assert.ok(Math.max(...fees) - Math.min(...fees) <= 1);
+  } finally {
+    await close();
+  }
+});

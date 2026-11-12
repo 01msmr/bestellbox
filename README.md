@@ -19,7 +19,7 @@ alle tragen Artikel ein, markieren sich als **ready** und später als **bezahlt*
 - **Frist** (Standard 20 min, beim Anlegen einstellbar, `+5 min`). Nach Ablauf ist die Runde geschlossen;
   Ersteller, Besteller und Admins können sie wieder öffnen.
 - **Schließen, wenn alle ready:** Option im Zeitfeld (Ersteller/Besteller/Admins); schließt automatisch, sobald alle User mit Artikeln „ready“ sind. Solange die Option aktiv ist, kommen neue User nur nach Freigabe hinein: ihr Versuch erscheint als Hinweis bei Ersteller/Besteller/Admins (Freigeben / Ablehnen), bestehende User sind nicht betroffen.
-- **Bestellt von** + PayPal-Adresse/Link und **Lieferkosten** (anteilig nach Artikelsumme verteilt).
+- **Bestellt von** + PayPal-Adresse/Link und **Lieferkosten** (gleichmäßig auf alle Besteller mit Artikeln verteilt).
 - **Bezahlen:** Block mit PayPal-Adresse des Bestellers (kopierbar) und, bei paypal.me-Adressen, einem Link mit dem
   eigenen Betrag. PayPal-Adresse (je Besteller) und Lieferkosten (je Restaurant) werden gemerkt und bei der nächsten
   Runde vorgeschlagen. Die Adresse erscheint nie in Listen, nur in der Runde für Teilnehmer, Besteller, Ersteller und Admins.

@@ -117,6 +117,12 @@ const EN = {
   'Bestellung ist geschlossen.': 'Order is closed.',
   'Noch nichts eingetragen.': 'Nothing added yet.',
   'Entfernen': 'Remove',
+  'Bearbeiten': 'Edit',
+  'Abbrechen': 'Cancel',
+  'Gelöscht: {name}': 'Deleted: {name}',
+  'Rückgängig': 'Undo',
+  'Summe Artikel': 'Items total',
+  '{fee} / {n} Besteller': '{fee} / {n} orderers',
   'Ready = deine Bestellung ist komplett. Bezahlt = du hast dem Besteller dein Geld gegeben.':
     'Ready = your order is complete. Paid = you have given the buyer your money.',
   // Bestellen

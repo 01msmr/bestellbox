@@ -46,6 +46,7 @@ export const LISTS = {
 /** Zeiten in Millisekunden. */
 export const TIMING = {
   toastMs: 2600,
+  undoMs: 15 * 1000, // so lange bleibt „Rückgängig“ nach dem Löschen einer Zeile
   refreshDebounceMs: 150,
   tickMs: 1000,
   lowTimeMs: 2 * 60 * 1000, // darunter wird der Countdown rot

@@ -118,7 +118,7 @@ function cleanUser(u) {
   return name;
 }
 
-/** Verteilt `total` Cents proportional zu `weights` (Largest Remainder). */
+/** Verteilt `total` Cents nach `weights` (Largest Remainder); Lieferkosten: Gewicht 1 je Besteller. */
 function distribute(total, weights) {
   const sum = weights.reduce((a, b) => a + b, 0);
   if (!total || !sum) return weights.map(() => 0);
@@ -421,7 +421,7 @@ export function createLogic(db, { admins = [] } = {}) {
       };
     });
 
-    const shares = distribute(r.delivery_fee_cents, users.map((u) => u.subtotal_cents));
+    const shares = distribute(r.delivery_fee_cents, users.map((u) => (u.subtotal_cents > 0 ? 1 : 0)));
     users.forEach((u, i) => {
       u.fee_cents = shares[i];
       u.total_cents = u.subtotal_cents + shares[i];

@@ -35,6 +35,26 @@
     if (!panel) return;
     const sync = () => {
       for (const b of panel.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+      const en = document.documentElement.lang === 'en';
+      const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
+      const sysName = en ? (sysDark ? 'dark' : 'light') : sysDark ? 'dunkel' : 'hell';
+      const state = { auto: `${en ? 'automatic' : 'automatisch'} = ${sysName}`, light: en ? 'off' : 'aus', dark: en ? 'on' : 'an' }[mode];
+      for (const el of panel.querySelectorAll('[data-cycle="mode"], [data-mode]')) {
+        el.title = `Dark mode: ${state}`;
+        el.setAttribute('aria-label', el.title);
+      }
+      const sysLang = (navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en';
+      const langName = (l) => (l === 'de' ? (en ? 'German' : 'Deutsch') : 'English');
+      const langState = lang === 'auto' ? `${en ? 'automatic' : 'automatisch'} = ${langName(sysLang)}` : langName(lang);
+      const themeNames = { mono: en ? 'B/W' : 'S/W', ozean: en ? 'Ocean' : 'Ozean', gruen: en ? 'Green' : 'Grün', orange: 'Orange', mais: en ? 'Corn' : 'Mais' };
+      for (const el of panel.querySelectorAll('[data-cycle="theme"], [data-theme]')) {
+        el.title = `${en ? 'Color' : 'Farbe'}: ${themeNames[theme]}`;
+        el.setAttribute('aria-label', el.title);
+      }
+      for (const el of panel.querySelectorAll('[data-cycle="lang"], [data-lang]')) {
+        el.title = `${en ? 'Language' : 'Sprache'}: ${langState}`;
+        el.setAttribute('aria-label', el.title);
+      }
       for (const b of panel.querySelectorAll('[data-theme]')) b.setAttribute('aria-pressed', String(b.dataset.theme === theme));
       for (const b of panel.querySelectorAll('[data-lang]')) b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
     };
@@ -59,5 +79,6 @@
       sync();
     });
     sync();
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', sync);
   });
 })();
