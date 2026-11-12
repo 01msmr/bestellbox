@@ -18,6 +18,11 @@ alle tragen Artikel ein, markieren sich als **ready** und später als **bezahlt*
 - **Statuszeile oben** (haftet unter dem Kopf): `eröffnet › ready › bestellt › geliefert` mit Uhrzeiten; der zuletzt erreichte Schritt ist
   grün, spätere sind dünn und kursiv. Davor ein gelber Hinweis, wer noch nicht ready ist. Darunter, falls nötig, der rote Hinweis
   mit den offenen Beträgen (Knopf „als bezahlt markieren“ mit Rückfrage „ist bezahlt?“).
+- **„Alle“-Liste:** pro User eine Karte mit abgesetzter Kopfzeile (Name, ready-/bezahlt-Marke; der Besteller trägt zusätzlich die Marke
+  *ist Besteller* mit Erläuterung als Hinweistext). Unter den Artikeln stehen „N Artikel“ und die Summe (inkl. Lieferanteil);
+  bei nur einem Artikel ohne Lieferanteil entfällt die Zeile, der Preis steht dann fett als Summe in der Artikelzeile.
+- **Bestellkopf:** Titel mit Restaurant und „<Besteller> bestellt“; Webadresse des Restaurants als schmale Pille mit Pfeil nach außen;
+  der eigene Name oben rechts als getönte Pille. Solange Beträge offen sind, bleibt unter der Statuszeile ein roter Rand mit Schatten sichtbar.
 - **Status:** `ready` und `bezahlt` sind zwei unabhängige Häkchen pro User, für alle sichtbar. Jeder User muss seine Artikel insgesamt als `ready` setzen; jede Änderung an den eigenen Artikeln setzt ihn wieder auf „nicht ready“. Solange ein User nicht ready ist, ist auch die Gesamtbestellung nicht ready (Warnbanner).
 - **Geschlossen:** Artikel von Usern, die nicht „ready“ sind, bleiben sichtbar, zählen aber nicht (Sammelbestellung, Summen, Schulden); „Wieder öffnen“ bringt sie zurück.
 - **Frist** (Standard 20 min, beim Anlegen einstellbar, `+5 min`). Nach Ablauf ist die Runde geschlossen;
