@@ -66,7 +66,7 @@ Node ≥ 22.13, keine Abhängigkeiten (nutzt `node:sqlite`).
 
 ```sh
 npm start                 # http://127.0.0.1:3000
-ADMINS=uli,max npm start  # Admins (dürfen jede Runde verwalten)
+ADMINS=anna,ben npm start  # Admins (dürfen jede Runde verwalten)
 npm test
 ```
 

@@ -17,7 +17,7 @@ test('fmtRemaining: Minuten, Sekunden erst in den letzten 3 Minuten', () => {
 });
 
 test('genitive: Apostroph bei Namen auf s/ß/x/z, sonst s', () => {
-  assert.equal(genitive('msmr', 'de'), 'msmrs');
+  assert.equal(genitive('maria', 'de'), 'marias');
   assert.equal(genitive('Klaus', 'de'), 'Klaus’');
   assert.equal(genitive('Max', 'de'), 'Max’');
   assert.equal(genitive('Moritz', 'de'), 'Moritz’');
@@ -58,10 +58,10 @@ test('pendingRound: offen oder geschlossen-unbestellt (12 h) blockiert, bestellt
 });
 
 test('payHref: PayPal-Name/-Link, Betrag optional, sonst kein Link', () => {
-  assert.equal(payHref('uli', 1250), 'https://paypal.me/uli/12.50EUR');
-  assert.equal(payHref('https://paypal.me/uli/', 500), 'https://paypal.me/uli/5.00EUR');
-  assert.equal(payHref('paypal.me/uli'), 'https://paypal.me/uli', 'ohne Betrag nur die Adresse');
-  assert.equal(payHref('paypal.me/uli', 0), 'https://paypal.me/uli');
+  assert.equal(payHref('alex', 1250), 'https://paypal.me/alex/12.50EUR');
+  assert.equal(payHref('https://paypal.me/alex/', 500), 'https://paypal.me/alex/5.00EUR');
+  assert.equal(payHref('paypal.me/alex'), 'https://paypal.me/alex', 'ohne Betrag nur die Adresse');
+  assert.equal(payHref('paypal.me/alex', 0), 'https://paypal.me/alex');
   assert.equal(payHref('DE12 3456 7890'), null, 'keine PayPal-Adresse');
   assert.equal(payHref(''), null);
 });

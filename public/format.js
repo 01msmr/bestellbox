@@ -14,7 +14,7 @@ export function fmtRemaining(ms) {
   return m >= 60 ? `${Math.floor(m / 60)}:${p2(m % 60)} h` : `${m} min`;
 }
 
-/** Besitzform: „Klaus’“, „msmrs“ (de) bzw. „Anna’s“, „James’“ (en). */
+/** Besitzform: „Klaus’“, „marias“ (de) bzw. „Anna’s“, „James’“ (en). */
 export function genitive(name, lang = 'de') {
   const end = name.slice(-1).toLowerCase();
   if (lang === 'de') return 'sßxz'.includes(end) ? `${name}’` : `${name}s`;

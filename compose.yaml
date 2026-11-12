@@ -3,7 +3,7 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      ADMINS: "uli,msmr"       # kommagetrennt; dürfen jede Runde verwalten
+      ADMINS: "${ADMINS:-}"      # kommagetrennt (z. B. per .env); dürfen jede Runde verwalten
     ports:
       - "127.0.0.1:3000:3000"  # lokal; im Toolbox-Netz auf 0.0.0.0 oder Reverse-Proxy ändern
     volumes:
