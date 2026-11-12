@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fmtRemaining, genitive, payHref, joinList, isToday, centsToInput } from '../public/format.js';
+import { fmtRemaining, genitive, payHref, joinList, isToday, centsToInput, roundStage } from '../public/format.js';
 import { isCurrentRound } from '../public/group.js';
 
 const MIN = 60000;
@@ -89,4 +89,12 @@ test('centsToInput: Cent als Eingabetext mit Komma', () => {
   assert.equal(centsToInput(0), '0,00');
   assert.equal(centsToInput(9950), '99,50');
   assert.equal(centsToInput(1300, '.'), '13.00', 'Dezimalzeichen wählbar (Englisch)');
+});
+
+test('roundStage: alles bezahlt vor geliefert vor bestellt vor geschlossen', () => {
+  assert.equal(roundStage({ locked: true, ordered: true, delivered: true, all_paid: true }), 'alles bezahlt');
+  assert.equal(roundStage({ locked: true, ordered: true, delivered: true }), 'geliefert');
+  assert.equal(roundStage({ locked: true, ordered: true }), 'bestellt');
+  assert.equal(roundStage({ locked: true }), 'geschlossen');
+  assert.equal(roundStage({ locked: false }), null);
 });

@@ -1,4 +1,4 @@
-# dinedock
+# dinedeck
 
 Gemeinsame Essensbestellung für Gruppen. Eine Person startet eine **Bestellung** bei einem Restaurant,
 alle tragen Artikel ein, markieren sich als **ready** und später als **bezahlt**. Alle sehen live denselben Stand.
@@ -101,13 +101,13 @@ npm test
 |-----------|------------------------|-------------------------------|
 | `HOST`    | `127.0.0.1`            | Bind-Adresse                  |
 | `PORT`    | `3000`                 | Port                          |
-| `DB_FILE` | `./data/dinedock.db` | SQLite-Datei                  |
+| `DB_FILE` | `./data/dinedeck.db` | SQLite-Datei                  |
 | `ADMINS`  | leer                   | Usernamen, kommagetrennt      |
 
-Docker: `docker compose up -d` (Daten im Volume `dinedock-data`; Admins per `ADMINS=anna,ben docker compose up -d` oder `.env`).
+Docker: `docker compose up -d` (Daten im Volume `dinedeck-data`; Admins per `ADMINS=anna,ben docker compose up -d` oder `.env`).
 Das Image kopiert `server.js`, `db.js`, `db/`, `security.js` und `public/` – neue Quelldateien dort ergänzen (`Dockerfile`).
 
-**Sicherung:** Die Daten liegen in `data/` (nicht im Repo). Konsistente Kopie bei laufendem Betrieb: `sqlite3 data/dinedock.db ".backup sicherung.db"`.
+**Sicherung:** Die Daten liegen in `data/` (nicht im Repo). Konsistente Kopie bei laufendem Betrieb: `sqlite3 data/dinedeck.db ".backup sicherung.db"`.
 
 ## Hinweis zur Sicherheit
 

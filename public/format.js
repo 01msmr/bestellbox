@@ -55,3 +55,11 @@ export function isToday(ms, now, nightEndHour) {
 
 /** Cent als Eingabetext („1300“ → „13,00“); Dezimalzeichen je Sprache wählbar. */
 export const centsToInput = (cents, decimal = ',') => (cents / 100).toFixed(2).replace('.', decimal);
+
+/** Stand einer geschlossenen Bestellung für die Listen: alles bezahlt > geliefert > bestellt > geschlossen; offen = null. */
+export function roundStage(r) {
+  if (!r.locked) return null;
+  if (r.all_paid) return 'alles bezahlt';
+  if (r.delivered) return 'geliefert';
+  return r.ordered ? 'bestellt' : 'geschlossen';
+}

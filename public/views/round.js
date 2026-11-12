@@ -349,9 +349,15 @@ export function roundView(id) {
         delta > 0 ? '+' : '−'
       );
     const closed = locked || mineU.done;
-    // nur Erledigtes: ready › bestellt › geliefert; der aktuell gültige Schritt fett
-    const doneSteps = [t('✓ ready'), ...(d.ordered_at ? [`✓ ${t('bestellt')}`] : []), ...(d.delivered_at ? [`✓ ${t('geliefert')}`] : [])];
-    const doneFlow = doneSteps.flatMap((txt, n) => [...(n ? [h('span', { class: 'strip-sep' }, '›')] : []), h('span', { class: n === doneSteps.length - 1 ? 'strip-cur' : 'strip-past' }, txt)]);
+    // persönlicher Ablauf: ready › bezahlt (Besteller: statt bezahlt der Hinweis); der zuletzt erreichte Schritt als grüne Pille
+    const isBuyer = lc(mineU.user) === lc(d.buyer);
+    const stp = (cls, txt) => h('span', { class: `step ${cls}` }, txt);
+    const roleNote = h('span', { class: 'step role', title: t('Der Besteller zahlt bei der Bestellung und bekommt das Geld von den anderen.') }, `✓ (${t('ist Besteller')})`);
+    const myFlow = mineU.done
+      ? isBuyer
+        ? [stp('now ready', t('✓ ready')), roleNote]
+        : [stp(mineU.paid ? 'done' : 'now ready', t('✓ ready')), h('span', { class: 'step-sep' }, '›'), mineU.paid ? stp('now', `✓ ${t('bezahlt')}`) : stp('todo', t('bezahlt'))]
+      : [t('unready – Artikel zählen nicht'), ...(isBuyer ? [roleNote] : [])];
     const priceCell = (c) => h('div', { class: 'price-in' }, h('span', { class: 'num-box' }, money(c)), h('span', { class: 'eur-box' }, '€'));
     const sumRow = (label, cents, cls = '') => h('div', { class: `sum-row ${cls}` }, h('div', { class: 'c-lbl' }, label), h('div', { class: 'c-amt' }, priceCell(cents)));
     const counted = d.users.filter((u) => u.subtotal_cents > 0).length;
@@ -363,7 +369,7 @@ export function roundView(id) {
       return h('div', { class: 'item-row item-line' }, qtyCol, col('art', field('article', i.article, LIMITS.article, { required: true, 'aria-label': t('Artikel') })), col('var', field('variant', i.variant || '', LIMITS.variant, { 'aria-label': t('Variante (optional)') })), col('price', h('div', { class: 'price-in' }, field('price', money(i.price_cents), 12, { inputmode: 'decimal', 'aria-label': t('Preis') }), h('span', { class: 'eur-box' }, '€'))), col('act', del));
     };
     mineList.replaceChildren(
-      h('div', { class: 'ready-strip ' + (mineU.done ? 'on' : 'pale') }, ...(mineU.done ? doneFlow : [t('unready – Artikel zählen nicht')])),
+      h('div', { class: 'ready-strip flow' + (mineU.done ? '' : ' unready') }, ...myFlow),
       h('div', { class: 'row between' }, h('h3', { class: 'flush' }, t('Meine Artikel')), h('div', { class: 'row' }, lc(mineU.user) === lc(d.buyer) ? null : flagBadge(mineU, 'paid'))),
       ...(undo ? [h('div', { class: 'row between undo-row' }, h('span', { class: 'muted' }, t('Gelöscht: {name}', { name: undo.item.article })), h('button', { class: 'btn small', type: 'button', onclick: doUndo }, t('Rückgängig')))] : []),
       mineU.items.length

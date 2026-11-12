@@ -38,18 +38,23 @@ export function createStatus({ banners, toggle, decide }) {
     const readyTxt = d.ready.total ? t('ready {done}/{total}', { done: d.ready.done, total: d.ready.total }) : t('ready');
     const opened = step('done', `✓ ${t('eröffnet')}`, fmtWhen(d.created_at));
     const ordTxt = `✓ ${t('bestellt')}`;
+    const allPaid = !d.debts.length && d.ordered_at && d.users.some((u) => u.subtotal_cents > 0);
     const flow = d.delivered_at
       ? [opened, step('done', `✓ ${t('ready')}`), step('done', ordTxt, fmtWhen(d.ordered_at)), step('now', `✓ ${t('geliefert')}`, fmtWhen(d.delivered_at))]
       : d.ordered_at
         ? [opened, step('done', `✓ ${t('ready')}`), step('now', ordTxt, fmtWhen(d.ordered_at)), step('todo', t('geliefert'))]
         : allReady
-          ? [opened, step('now', `✓ ${readyTxt}`), step('todo', t('bestellt')), step('todo', t('geliefert'))]
+          ? [opened, step('now ready', `✓ ${readyTxt}`), step('todo', t('bestellt')), step('todo', t('geliefert'))]
           : null;
-    if (flow) b.push(h('div', { class: 'status-flow' + (d.unpaid ? ' unpaid' : '') }, ...flow.flatMap((x, n) => (n ? [sep(), x] : [x]))));
-    else if (d.ready.total) b.push(h('div', { class: 'banner warn' }, t('Noch nicht alle ready ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
+    if (flow) {
+      if (allPaid) flow.forEach((el) => el.classList.replace('now', 'done'));
+      flow.push(allPaid ? step('now', `✓ ${t('bezahlt')}`) : step('todo', t('bezahlt')));
+    }
+    if (flow) b.push(h('div', { class: 'status-flow' + (d.unpaid ? ' unpaid' : allPaid ? ' paid' : '') }, ...flow.flatMap((x, n) => (n ? [sep(), x] : [x]))));
+    else if (d.ready.total) b.push(h('div', { class: 'banner bad' }, t('Noch nicht alle ready ({done}/{total}): {names}', { done: d.ready.done, total: d.ready.total, names: d.ready.not_ready.join(', ') })));
     if (d.unpaid) b.push(h('div', { class: 'banner bad' }, t(d.debts.length === 1 ? '{n} hat noch nicht bezahlt: {names} ({sum} offen)' : '{n} haben noch nicht bezahlt: {names} ({sum} offen)', { n: d.debts.length, names: joinList(d.debts.map((x) => x.user), t('und')), sum: eur(d.debts_total_cents) })));
     if (d.debts.length) b.push(h('div', { class: 'status-debts' }, ...d.debts.map(debtRow)));
-    else if (d.ordered_at && d.users.some((u) => u.subtotal_cents > 0)) b.push(h('div', { class: 'banner ok' }, t('✓ Alles bezahlt')));
+    else if (allPaid) b.push(h('div', { class: 'banner ok' }, t('✓ alles bezahlt')));
     for (const u of d.pending) {
       b.unshift(h('div', { class: 'banner bad row between' },
         h('span', null, t('Neu: {user} möchte mitbestellen', { user: u })),

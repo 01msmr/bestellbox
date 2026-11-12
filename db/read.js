@@ -163,6 +163,7 @@ export function createReads({ db, q, getRound, isLocked, isAdmin, canManage, isB
         ordered: !!d.ordered_at,
         delivered: !!d.delivered_at,
         unpaid: d.unpaid,
+        all_paid: !!d.ordered_at && !d.debts.length && d.users.some((u) => u.subtotal_cents > 0),
         users: d.ready.total,
         done: d.ready.done,
         total_cents: d.grand_total_cents,

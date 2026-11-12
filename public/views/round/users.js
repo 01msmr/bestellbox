@@ -5,11 +5,14 @@ import { eur, h, lc, me } from '/util.js';
 export function flagBadge(d, toggle, u, flag) {
   const on = u[flag];
   const label = flag === 'done' ? (on ? t('✓ ready') : t('unready')) : on ? t('✓ bezahlt') : t('nicht bezahlt');
-  const cls = on ? (flag === 'done' && d.ordered_at ? 'idle' : 'on') : flag === 'done' ? 'pale' : 'off'; // nach Bestellt: ready nur noch grau
+  const cls = flag === 'done' ? (on ? 'mid' : 'off') : on ? 'on' : 'off'; // ready gelb, unready rot, bezahlt grün
   const editable = lc(u.user) === lc(me) || (flag === 'paid' && d.viewer.is_buyer);
   if (!editable || flag === 'done') return h('span', { class: `badge ${cls}` }, label); // ready wird nur über den Button gesetzt
   return h('button', { class: `badge ${cls}`, title: t('Umschalten'), onclick: () => toggle(flag, { user: u.user, value: !on }) }, label);
 }
+
+// Passive Marke „ist Besteller“ (grau, wie ein inaktives ready)
+export const buyerBadge = () => h('span', { class: 'badge idle', title: t('Der Besteller zahlt bei der Bestellung und bekommt das Geld von den anderen.') }, t('ist Besteller'));
 
 function itemsTable(u, asSum) {
   return h(
@@ -34,7 +37,7 @@ export function renderUsers(d, toggle, usersPane) {
     return h(
       'section',
       { class: `card user-card ${u.done ? (u.paid || lc(u.user) === lc(d.buyer) ? 'paid' : 'unpaid') : 'unready'}` },
-      h('div', { class: 'row between card-head' }, h('strong', null, u.user + (lc(u.user) === lc(d.buyer) ? t(' (Besteller)') : '')), h('div', { class: 'row' }, flagBadge(d, toggle, u, 'done'), lc(u.user) === lc(d.buyer) ? h('span', { class: 'badge idle', title: t('Der Besteller zahlt bei der Bestellung und bekommt das Geld von den anderen.') }, t('ist Besteller')) : null, !u.done || lc(u.user) === lc(d.buyer) ? null : flagBadge(d, toggle, u, 'paid'))),
+      h('div', { class: 'row between card-head' }, h('strong', null, u.user + (lc(u.user) === lc(d.buyer) ? t(' (Besteller)') : '')), h('div', { class: 'row' }, flagBadge(d, toggle, u, 'done'), lc(u.user) === lc(d.buyer) ? buyerBadge() : null, !u.done || lc(u.user) === lc(d.buyer) ? null : flagBadge(d, toggle, u, 'paid'))),
       u.items.length ? itemsTable(u, u.done && count === 1 && !u.fee_cents) : h('div', { class: 'muted' }, t('noch nichts')),
       u.done && (count > 1 || u.fee_cents) // bei nur 1 Artikel ohne Lieferanteil wäre die Summe doppelt
         ? h(

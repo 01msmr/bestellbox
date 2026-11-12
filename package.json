@@ -1,5 +1,5 @@
 {
-  "name": "dinedock",
+  "name": "dinedeck",
   "version": "0.1.0",
   "description": "Gemeinsame Essensbestellung für Gruppen: Bestellungen, Sammelbestellung, fertig/bezahlt-Status, Live-Updates.",
   "type": "module",

@@ -2,6 +2,7 @@
 import { t, locale } from '/i18n.js';
 import { LISTS, TIMING } from '/config.js';
 import { groupHistory, isCurrentRound } from '/group.js';
+import { roundStage } from '/format.js';
 import { eur, h, api, me, fmtRemaining, fmtWhen } from '/util.js';
 
 const sideEl = document.getElementById('side');
@@ -30,7 +31,7 @@ export function renderSide() {
         r.unpaid
           ? h('span', { class: 'badge off' }, eur(r.debts_total_cents))
           : r.locked
-            ? h('span', null, r.ordered ? t('bestellt') : t('geschlossen'))
+            ? h('span', { class: roundStage(r) === 'alles bezahlt' ? 'badge on' : null }, t(roundStage(r)))
             : h('span', { class: 'badge on', 'data-expires': r.expires_at }, '…')
       )
     );

@@ -1,4 +1,4 @@
-// dinedock – Frontend (Vanilla JS, ES-Module, keine Build-Schritte)
+// dinedeck – Frontend (Vanilla JS, ES-Module, keine Build-Schritte)
 // Einstieg: Name wählen, Router (#/ Start, #/new, #/r/<Nr>, #/all, #/stats), Live-Updates per SSE.
 import { t } from '/i18n.js';
 import { LIMITS, TIMING } from '/config.js';

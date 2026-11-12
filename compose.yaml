@@ -1,5 +1,5 @@
 services:
-  dinedock:
+  dinedeck:
     build: .
     restart: unless-stopped
     environment:
@@ -7,6 +7,6 @@ services:
     ports:
       - "127.0.0.1:3000:3000"  # lokal; im lokalen Netz auf 0.0.0.0 oder Reverse-Proxy ändern
     volumes:
-      - dinedock-data:/data
+      - dinedeck-data:/data
 volumes:
-  dinedock-data:
+  dinedeck-data:

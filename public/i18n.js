@@ -100,6 +100,7 @@ const EN = {
   '✓ ready': '✓ ready',
   'unready': 'unready',
   '✓ bezahlt': '✓ paid',
+  'bezahlt': 'paid',
   'nicht bezahlt': 'not paid',
   'Umschalten': 'Toggle',
   'Speichern': 'Save',
@@ -149,7 +150,8 @@ const EN = {
   'Text kopieren': 'Copy text',
   'Anrufen': 'Call',
   // Offene Beträge
-  '✓ Alles bezahlt': '✓ All paid',
+  '✓ alles bezahlt': '✓ all paid',
+  'alles bezahlt': 'all paid',
   'als bezahlt markieren': 'mark as paid',
   'ist bezahlt?': 'is paid?',
   'Bezahlen an {buyer}': 'Pay {buyer}',

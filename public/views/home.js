@@ -2,14 +2,14 @@
 import { t } from '/i18n.js';
 import { LIMITS, DEFAULTS } from '/config.js';
 import { pendingRound } from '/group.js';
+import { roundStage } from '/format.js';
 import { tickCountdowns } from '/side.js';
 import { app, eur, fmtDate, lc, h, api, act, me, parseMoney, money } from '/util.js';
 
 export const roundItem = (r, highlight = false) => {
-  const status = r.ordered
-    ? h('span', { class: 'badge on' }, t('bestellt'))
-    : r.locked
-    ? h('span', { class: 'badge mid' }, t('geschlossen'))
+  const stage = roundStage(r);
+  const status = stage
+    ? h('span', { class: 'badge ' + (stage === 'alles bezahlt' ? 'on' : 'mid') }, t(stage))
     : h('span', { class: 'badge on', 'data-expires': r.expires_at }, '…');
   return h(
     'a',

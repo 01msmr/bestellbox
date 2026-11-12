@@ -1,4 +1,4 @@
-/* dinedock – minimalistisch. Modus (auto/hell/dunkel) über color-scheme + light-dark(),
+/* dinedeck – minimalistisch. Modus (auto/hell/dunkel) über color-scheme + light-dark(),
    Farbthema über [data-theme] (mono = schwarz/weiß, ozean, gruen, orange, mais). */
 
 :root { color-scheme: light dark; }
@@ -112,7 +112,6 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .badge.off { background: var(--bad); color: var(--on-bad); }
 .badge.mid { background: var(--warn); color: var(--on-warn); }
 .badge.idle { background: light-dark(#b6b6c7, #ebebfc); color: light-dark(#fff, #0f0f12); }
-.badge.pale { background: var(--wash); color: var(--muted); border-color: var(--line); }
 button.badge { cursor: pointer; font: inherit; font-size: 0.8125rem; font-weight: 600; }
 button.badge:hover { filter: brightness(1.12); }
 
@@ -235,7 +234,7 @@ a.btn { text-decoration: none; text-align: center; }
 .ready-bar { display: flex; flex-wrap: wrap; gap: 0.625rem 1rem; align-items: center; justify-content: flex-end; margin-top: 0.75rem; font-weight: 600; }
 .ready-bar > span { flex: 0 0 auto; }
 button.btn.ready { margin-left: 0; padding: 0.6875rem 1.625rem; font-size: 1.0625rem; box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--accent) 28%, transparent); animation: ready-pulse 2s ease-in-out infinite; }
-.ready-bar.is-done button.btn.ready { background: var(--ok); border-color: var(--ok); color: var(--on-ok); box-shadow: none; animation: none; }
+.ready-bar.is-done button.btn.ready { background: var(--warn); border-color: var(--warn); color: var(--on-warn); box-shadow: none; animation: none; }
 @keyframes ready-pulse { 50% { box-shadow: 0 0 0 0.4375rem color-mix(in srgb, var(--accent) 12%, transparent); } }
 @media (prefers-reduced-motion: reduce) { button.btn.ready { animation: none; } }
 
@@ -329,25 +328,25 @@ input[type="checkbox"] { width: auto; flex: none; }
 .statusbar:not(:empty), .status-lines:not(:empty) { display: contents; }
 .status-lines > * + * { margin-top: 0.1875rem; }
 .status-flow { display: flex; justify-content: center; align-items: center; gap: 0.625rem; flex-wrap: wrap; padding: 0 1rem; height: var(--flow-h); box-sizing: border-box; overflow: hidden; font-size: 1rem; position: sticky; top: var(--top-h); z-index: 5; background: var(--bg); }
-.status-flow .step-sep { color: var(--muted); }
-.status-flow .done { font-weight: 600; color: var(--fg); }
-.status-flow .now { font-weight: 700; background: var(--ok); color: var(--on-ok); padding: 0.25rem 0.75rem; border-radius: 999px; }
+.status-flow .step-sep, .ready-strip .step-sep { color: var(--muted); }
+.status-flow .done, .ready-strip .done { font-weight: 600; color: var(--fg); }
+.status-flow .now, .ready-strip .now { font-weight: 700; background: var(--ok); color: var(--on-ok); padding: 0.25rem 0.75rem; border-radius: 999px; }
 .status-flow .step-time { font-weight: 400; }
-.status-flow .todo { font-weight: 300; font-style: italic; color: var(--muted); }
+.status-flow .now.ready { background: var(--warn); color: var(--on-warn); }
+.status-flow .todo, .ready-strip .todo { font-weight: 300; font-style: italic; color: var(--muted); }
 .status-lines .banner { border: 0; border-radius: 0; padding: 0.625rem 1rem; font-size: 1rem; font-weight: 700; text-align: center; }
 .status-lines .banner.warn { background: var(--warn); color: var(--on-warn); }
 .status-lines .banner.ok { background: var(--ok); color: var(--on-ok); }
 .status-lines .banner.bad { background: var(--bad); color: var(--on-bad); }
 
-/* „Ich bin ready“ solange nicht ready: grau wie das unready-Badge (wirkt nicht wie erledigt) */
-.ready-bar:not(.is-done) button.btn.ready { background: color-mix(in srgb, var(--fg) 14%, var(--bg)); color: var(--fg); border-color: var(--muted); box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--muted) 30%, transparent); animation-name: ready-pulse-grey; }
-@keyframes ready-pulse-grey { 50% { box-shadow: 0 0 0 0.4375rem color-mix(in srgb, var(--muted) 12%, transparent); } }
+/* „Ich bin ready“ solange nicht ready: rot wie unready, danach gelb wie ready */
+.ready-bar:not(.is-done) button.btn.ready { background: var(--bad); color: var(--on-bad); border-color: var(--bad); box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--bad) 30%, transparent); animation-name: ready-pulse-grey; }
+@keyframes ready-pulse-grey { 50% { box-shadow: 0 0 0 0.4375rem color-mix(in srgb, var(--bad) 12%, transparent); } }
 
 /* Ready-Status über „Meine Artikel“: Rechteck ohne Radius, volle Kartenbreite */
 .mine-card { overflow: hidden; }
 .ready-strip { margin: -0.875rem -0.875rem 0.75rem; padding: 0.375rem 0.875rem; border-radius: 0; font-size: 1rem; font-weight: 600; }
 .ready-strip.on { background: var(--ok); color: var(--on-ok); }
-.ready-strip.pale { background: var(--wash); color: var(--bad-text); border-bottom: 1px solid var(--line); font-weight: 800; }
 
 /* Preis-Hinweis: schlichter Text links unten in der Karte, ohne eigenen Kasten */
 .price-hint { margin: 1.375rem 0 0; font-size: 0.875rem; color: var(--muted); text-align: left; }
@@ -380,9 +379,6 @@ tfoot td.foot-lbl { text-align: right; padding-right: 1.5rem; }
 .round-head .round-title { margin: 0; font-size: 1.75rem; line-height: 1.2; }
 .round-buyer { margin-left: 0.75rem; font-size: 1.125rem; font-weight: 400; color: var(--muted); }
 
-.ready-strip .strip-sep { margin: 0 0.5rem; opacity: .7; }
-.ready-strip .strip-cur { font-weight: 700; }
-.ready-strip .strip-past { font-weight: 400; }
 
 /* Tabs angedockt an das folgende Panel, zwei Zeilen Abstand darüber; aktiv = Farbe des Panels, passiv = dunkler */
 .round-main > .tabs { margin-top: 0.5rem; margin-bottom: -1rem; gap: 0.25rem; position: relative; z-index: 1; }
@@ -453,12 +449,14 @@ tfoot td.foot-lbl { text-align: right; padding-right: 1.5rem; }
   }
 }
 
-/* Offene Beträge: der 6-px-Rand unter der Statuszeile ist immer sichtbar, solange etwas offen ist; der weiche Schatten kommt beim Scrollen dazu */
-.status-flow.unpaid { box-shadow: 0 0.375rem 0 0 var(--bad); }
-@keyframes status-unpaid { from { box-shadow: 0 0.375rem 0 0 var(--bad), 0 0 0 0 transparent; } to { box-shadow: 0 0.375rem 0 0 var(--bad), 0 0.9rem 0.9rem -0.3rem rgb(0 0 0 / 0.5); } }
+/* Der 6-px-Rand unter der Statuszeile ist immer sichtbar: rot solange etwas offen ist, grün wenn alles bezahlt ist; der weiche Schatten kommt beim Scrollen dazu */
+.status-flow.unpaid { --edge: var(--bad); }
+.status-flow.paid { --edge: var(--ok); }
+.status-flow.unpaid, .status-flow.paid { box-shadow: 0 0.375rem 0 0 var(--edge); }
+@keyframes status-unpaid { from { box-shadow: 0 0.375rem 0 0 var(--edge), 0 0 0 0 transparent; } to { box-shadow: 0 0.375rem 0 0 var(--edge), 0 0.9rem 0.9rem -0.3rem rgb(0 0 0 / 0.5); } }
 @media (min-width: 43.75em) {
   @supports (animation-timeline: scroll()) {
-    .status-flow.unpaid { animation-name: status-unpaid; animation-range: 1.5rem 3.5rem; }
+    .status-flow.unpaid, .status-flow.paid { animation-name: status-unpaid; animation-range: 1.5rem 3.5rem; }
   }
 }
 
@@ -499,3 +497,7 @@ tfoot td.foot-lbl { text-align: right; padding-right: 1.5rem; }
 .qr-pop:hover .qr-big, .qr-pop:focus .qr-big { transform: scale(1); opacity: 1; }
 @media (max-width: 43.75em) { .qr-pop .qr-big { right: auto; left: 0; bottom: calc(100% + 0.5rem); transform-origin: bottom left; } }
 @media (max-width: 43.75em) { .qr-pop { margin: 0 0.75rem 0 0; } }
+.ready-strip.flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0.625rem; background: var(--wash); color: var(--fg); border-bottom: 1px solid var(--line); }
+.ready-strip.flow.unready { background: var(--bad); color: var(--on-bad); border-bottom: 0; }
+.ready-strip .now.ready { background: var(--warn); color: var(--on-warn); }
+.ready-strip .role { font-weight: 400; }

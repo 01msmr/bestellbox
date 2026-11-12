@@ -34,7 +34,7 @@ export function statsView() {
       onclick: async () => {
         const rows = await act(() => api('GET', '/export'));
         if (!rows) return;
-        const a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' })), download: `dinedock-export-${new Date().toISOString().slice(0, 10)}.json` });
+        const a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' })), download: `dinedeck-export-${new Date().toISOString().slice(0, 10)}.json` });
         a.click();
         URL.revokeObjectURL(a.href);
       },

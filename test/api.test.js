@@ -89,6 +89,7 @@ test('Unbezahlte Runde und Statistik', async () => {
 
     const list = (await call('GET', '/api/rounds', 'alex')).body;
     assert.equal(list[0].unpaid, true);
+    assert.equal(list[0].all_paid, false);
     assert.deepEqual(list[0].debts_users.sort(), ['anna', 'bob']);
 
     const st = (await call('GET', '/api/stats?scope=last30', 'alex')).body;
