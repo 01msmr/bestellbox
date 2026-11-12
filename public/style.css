@@ -442,7 +442,7 @@ tfoot td.foot-lbl { text-align: right; padding-right: 1.5rem; }
 .flush { margin: 0; }
 .w-full { width: 100%; } .w-eta { width: 5.25rem; }
 .nowrap { flex-wrap: nowrap; } .wrap { flex-wrap: wrap; }
-.semibold { font-weight: 600; } .text-fg { color: var(--fg); } .no-underline { text-decoration: none; }
+.extralight { font-weight: 200; } .semibold { font-weight: 600; } .text-fg { color: var(--fg); } .no-underline { text-decoration: none; }
 .grid3-even { grid-template-columns: 1fr 1fr 1fr; }
 
 /* Haftende Statuszeile: Schatten darunter, sobald gescrollt wird (wo scrollgesteuerte Animation unterstützt ist) */
@@ -467,3 +467,10 @@ tfoot td.foot-lbl { text-align: right; padding-right: 1.5rem; }
 
 /* Gemeinsame getönte Pillenfarbe (Nutzer-Pille, Link im Restaurant-Kopf): hell dunkel getönt, dunkel hell getönt */
 :root { --tint-bg: light-dark(color-mix(in srgb, var(--accent) 55%, #000), color-mix(in srgb, var(--accent) 40%, #fff)); --tint-fg: light-dark(#fff, #0f0f12); }
+
+/* Erste Zeile einer User-Karte: farblich abgesetzt (hell: dunkler, dunkel: heller), über die volle Kartenbreite */
+.user-card > .card-head { margin: -0.875rem -0.875rem 0.5rem; padding: 0.25rem 0.875rem; background: light-dark(color-mix(in srgb, #000 9%, var(--surface)), color-mix(in srgb, #fff 7%, var(--surface))); border-radius: var(--radius) var(--radius) 0 0; }
+/* Erste Karte direkt unter den Tabs: auch das Kopfband eckig, damit keine Radien gestapelt sind */
+.round-main > .tabs ~ * > .card:first-child > .card-head { border-top-left-radius: 0; border-top-right-radius: 0; }
+.end { justify-content: flex-end; }
+.user-items td.num { width: 1%; }

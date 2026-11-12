@@ -109,7 +109,7 @@ export function roundView(id) {
 
   const panes = { users: usersPane, mine: minePane, order: orderPane };
   const tabDefs = [
-    ['mine', lang === 'de' ? `${genitive(me, 'de')} Artikel` : `${genitive(me, 'en')} items`],
+    ['mine', [me, h('span', { class: 'extralight' }, genitive(me, lang).slice(me.length)), lang === 'de' ? ' Artikel' : ' items']],
     ['users', t('Alle')],
     ['order', t('Sammelbestellung')],
   ];
@@ -215,7 +215,7 @@ export function roundView(id) {
 
   function renderHead() {
     headTop.replaceChildren(
-      h('h2', { class: 'round-title' }, d.restaurant.name, h('span', { class: 'round-buyer' }, d.buyer)),
+      h('h2', { class: 'round-title' }, d.restaurant.name, h('span', { class: 'round-buyer' }, h('strong', null, d.buyer), ` ${t('bestellt')}`)),
       contactLinks(d.restaurant, { linkPill: true }),
       ...(d.restaurant.address ? [h('div', { class: 'muted' }, d.restaurant.address)] : [])
     );

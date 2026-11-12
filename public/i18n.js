@@ -10,6 +10,10 @@ const EN = {
   'Los': 'Go',
   // Neue Runde / Übersicht
   'keine Telefonnummer': 'no phone number',
+  'ist Besteller': 'is the buyer',
+  '1 Artikel': '1 item',
+  '{n} Artikel': '{n} items',
+  'Der Besteller zahlt bei der Bestellung und bekommt das Geld von den anderen.': 'The buyer pays when ordering and receives the money from the others.',
   'bei': 'at',
   'durch': 'by',
   'z. B. Pizza Roma': 'e.g. Pizza Roma',
