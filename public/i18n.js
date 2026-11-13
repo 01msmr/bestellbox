@@ -53,7 +53,7 @@ const EN = {
   'QR-Code zum Bezahlen': 'QR code to pay',
   'Als Gast': 'As guest',
   'als Gast': 'as guest',
-  'Name gilt nur in diesem Tab, der gespeicherte Name des Rechners bleibt': 'Name applies to this tab only; the name saved on this computer stays',
+  'Nutze dies zum Bestellen für jemand anderes: Der Name gilt nur in diesem Tab, dein gespeicherter Name bleibt.': 'Use this to order for someone else: the name applies to this tab only, your saved name stays.',
   'Nur du selbst kannst deine Artikel als ready bestätigen': 'Only you can mark your own items as ready',
   'Noch nicht ready – zählt nicht in der Bestellung': 'Not ready yet – not part of the order',
   'Lieferzeit (Minuten, geschätzt)': 'Delivery time (minutes, estimated)',
