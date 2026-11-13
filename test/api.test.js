@@ -570,6 +570,30 @@ test('Sicherheits- und Cache-Header auf Seiten und API', async () => {
   }
 });
 
+test('FRAME_ANCESTORS erlaubt das Einbetten nur für die genannten Seiten', async () => {
+  const { server, close } = await boot({ frameAncestors: ['https://l.example.org'] });
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    assert.equal(res.headers.get('x-frame-options'), null);
+    assert.ok((res.headers.get('content-security-policy') ?? '').includes('frame-ancestors https://l.example.org'));
+    await res.arrayBuffer();
+  } finally {
+    await close();
+  }
+});
+
+test('FRAME_ANCESTORS: ungültige Einträge werden ignoriert, das Einbetten bleibt gesperrt', async () => {
+  const { server, close } = await boot({ frameAncestors: ["https://a.org; script-src *"] });
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    assert.equal(res.headers.get('x-frame-options'), 'DENY');
+    assert.ok((res.headers.get('content-security-policy') ?? '').includes("frame-ancestors 'none'"));
+    await res.arrayBuffer();
+  } finally {
+    await close();
+  }
+});
+
 test('index.html: Cache-Version (?v=) an Stylesheet und Skripten', async () => {
   const { server, close } = await boot();
   try {

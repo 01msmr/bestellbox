@@ -32,6 +32,7 @@ npm test
 | `PORT`    | `3000`                | Port                      |
 | `DB_FILE` | `./data/dinedeck.db`  | SQLite file               |
 | `ADMINS`  | empty                 | Comma-separated usernames |
+| `FRAME_ANCESTORS` | empty | Space/comma-separated origins (e.g. `https://l.example.org`) allowed to embed the app in an iframe; empty = embedding blocked |
 
 Docker: `docker compose up -d` (data in volume `dinedeck-data`). The image copies `server.js`, `db.js`, `db/`, `security.js` and `public/`; add new source files in the `Dockerfile`.
 

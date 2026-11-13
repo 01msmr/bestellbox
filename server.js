@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openDb, createLogic, HttpError } from './db.js';
-import { SECURITY_HEADERS } from './security.js';
+import { securityHeaders } from './security.js';
 import { LIMITS, TIMING } from './public/config.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -18,7 +18,8 @@ const MIME = {
   '.webmanifest': 'application/manifest+json',
 };
 
-export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
+export function createApp({ dbFile = ':memory:', admins = [], frameAncestors = [] } = {}) {
+  const headers = securityHeaders(frameAncestors);
   const db = openDb(dbFile);
   const logic = createLogic(db, { admins });
   const clients = new Set();
@@ -160,7 +161,7 @@ export function createApp({ dbFile = ':memory:', admins = [] } = {}) {
   }
 
   const server = http.createServer(async (req, res) => {
-    for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
+    for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
     try {
       const url = new URL(req.url, 'http://localhost');
       if (url.pathname.startsWith('/api/')) await api(req, res, url);
@@ -186,9 +187,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const port = Number(process.env.PORT ?? 3000);
   const host = process.env.HOST ?? '127.0.0.1';
   const admins = (process.env.ADMINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const frameAncestors = (process.env.FRAME_ANCESTORS ?? '').split(/[\s,]+/).filter(Boolean);
   const dbFile = process.env.DB_FILE ?? './data/dinedeck.db';
   if (dbFile !== ':memory:') mkdirSync(path.dirname(path.resolve(dbFile)), { recursive: true });
-  const server = createApp({ dbFile, admins });
+  const server = createApp({ dbFile, admins, frameAncestors });
   server.listen(port, host, () => console.log(`dinedeck läuft auf http://${host}:${port}`));
   const stop = () => {
     server.closeAllConnections?.();
