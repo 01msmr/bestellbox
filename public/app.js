@@ -50,7 +50,7 @@ function askName(overlay = false) {
         isGuest && homeName()
           ? h('button', { class: 'btn ghost', type: 'button', onclick: () => { setMe(homeName()); if (overlay) close(); resolve(true); } }, `${t('Zurück zu')} ${homeName()}`)
           : null,
-        h('button', { class: 'btn ghost', type: 'button', title: t('Nutze dies zum Bestellen für jemand anderes'), onclick: () => done(true) }, t('Als Gast')),
+        h('button', { class: 'btn ghost', type: 'button', title: t('Bestelle für jemand anderen'), onclick: () => done(true) }, t('Als Gast')),
         h('button', { class: 'btn', type: 'submit' }, t('Los'))
       )
     );

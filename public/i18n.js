@@ -53,7 +53,7 @@ const EN = {
   'QR-Code zum Bezahlen': 'QR code to pay',
   'Als Gast': 'As guest',
   'als Gast': 'as guest',
-  'Nutze dies zum Bestellen für jemand anderes': 'Use this to order for someone else',
+  'Bestelle für jemand anderen': 'Order for someone else',
   'Nur du selbst kannst deine Artikel als ready bestätigen': 'Only you can mark your own items as ready',
   'Noch nicht ready – zählt nicht in der Bestellung': 'Not ready yet – not part of the order',
   'Lieferzeit (Minuten, geschätzt)': 'Delivery time (minutes, estimated)',
