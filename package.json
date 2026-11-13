@@ -1,7 +1,7 @@
 {
   "name": "dinedeck",
   "version": "0.1.0",
-  "description": "Gemeinsame Essensbestellung für Gruppen: Bestellungen, Sammelbestellung, fertig/bezahlt-Status, Live-Updates.",
+  "description": "Group food ordering: shared orders, combined order list, ready/paid status, live updates.",
   "type": "module",
   "private": true,
   "engines": { "node": ">=22.13" },
